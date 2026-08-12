@@ -29,3 +29,14 @@ jobs:
       - run: npm test
 
       - run: npm run build
+
+  docker:
+    name: Build container image
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Builds the same multi-stage image that ships, so a broken Dockerfile
+      # fails here rather than at deploy time.
+      - run: docker build -t plan-vs-actual-api:ci .
