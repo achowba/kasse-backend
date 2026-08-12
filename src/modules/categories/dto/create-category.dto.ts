@@ -1,0 +1,22 @@
+import { ApiProperty } from '@nestjs/swagger';
+import { IsString, MaxLength, MinLength } from 'class-validator';
+import { CATEGORY_NAME_MAX_LENGTH } from '../schemas/category.schema';
+
+/**
+ * A category to create.
+ *
+ * @property name - The name as it should be displayed.
+ */
+export class CreateCategoryDTO {
+  @ApiProperty({
+    description:
+      'Name as it should be displayed. Uniqueness is checked case and spacing insensitively, so "Cloud Hosting" and "cloud  hosting" are the same category.',
+    example: 'Cloud Hosting',
+    minLength: 1,
+    maxLength: CATEGORY_NAME_MAX_LENGTH,
+  })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(CATEGORY_NAME_MAX_LENGTH)
+  name!: string;
+}
