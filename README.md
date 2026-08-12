@@ -36,7 +36,8 @@ The API is client agnostic. It speaks JSON over REST, carries sessions in the `A
 | Area | Status |
 |---|---|
 | Project scaffold, strict TypeScript, lint, CI | Done |
-| Conventions and agent configuration | Not started |
+| Conventions, commit tooling, agent index | Done |
+| PR template and agent skills | Not started |
 | Platform layer: config, logging, errors, docs, health | Not started |
 | Core domain: months, money, variance, pagination | Not started |
 | Auth and sessions | Not started |
@@ -58,7 +59,7 @@ The API is client agnostic. It speaks JSON over REST, carries sessions in the `A
 | Layer | Choice | Reason |
 |---|---|---|
 | Runtime | Node.js 22 LTS | Current LTS. Pinned in `.nvmrc` and `engines`. |
-| Language | TypeScript 5.7, `strict: true` | No implicit `any`, no unchecked index access. See `conventions/code-standards.convention.md`. |
+| Language | TypeScript 5.7, `strict: true` | No implicit `any`, no unchecked index access. See `.agents/conventions/code-standards.convention.md`. |
 | Framework | NestJS 11 | Module boundaries, dependency injection, and first party support for validation, documentation, and health checks. |
 | Database | MongoDB 8 with Mongoose 8 | Document model fits sparse plan and actual grids. Aggregation does the report in one round trip. |
 | Tests | Jest 30, Supertest, mongodb-memory-server | Unit tests beside their source, end to end tests against a real in process replica set. |
@@ -114,7 +115,7 @@ Locking is reversible. Unlocking is recorded in the audit log along with every o
 
 | Tool | Version | Notes |
 |---|---|---|
-| Node.js | 22.13.0 or later | `nvm use` reads `.nvmrc`. |
+| Node.js | 22.13.0 or later | Pinned in `mise.toml`. `mise install` or `nvm use` both work; `.nvmrc` mirrors the same major version. |
 | npm | 10.9.0 or later | Ships with Node 22. |
 | Docker | Any recent version with Compose v2 | Only for the local database. Not needed if you point `MONGODB_URI` at Atlas. |
 
@@ -123,10 +124,13 @@ Locking is reversible. Unlocking is recorded in the audit log along with every o
 ```bash
 git clone <repository-url>
 cd plan-vs-actual-tracker
-nvm use
-npm install
+mise install                          # or: nvm use
+npm install                           # also installs the git hooks via husky
+git config commit.template .gitmessage
 cp .env.example .env
 ```
+
+Commit messages are checked by `commitlint` from a Husky `commit-msg` hook, so a message without a type and scope is rejected before it lands.
 
 Fill in `.env`, then generate the two auth secrets:
 
@@ -233,8 +237,11 @@ End to end tests cover the three behaviours the assignment names: the report's n
 
 ```
 .
+├── AGENTS.md                    Index of the engineering standards
+├── .agents/conventions/         The standards themselves, one file per topic
+├── .agents/skills/              Repeatable workflows for PR docs, review, tests
 ├── .github/workflows/ci.yml     Format, lint, typecheck, test, build on every PR
-├── conventions/                 Engineering standards, one file per topic
+├── .husky/commit-msg            Runs commitlint on every commit message
 ├── docker-compose.yml           Local MongoDB as a single node replica set
 ├── openapi.json                 Generated API contract, consumed by the web client
 ├── src/
@@ -245,6 +252,8 @@ End to end tests cover the three behaviours the assignment names: the report's n
 │   └── seed/                    Seed entry points
 └── test/                        End to end specs and their Jest config
 ```
+
+This is the layout the project targets. The [implementation status](#implementation-status) table above says which parts exist today.
 
 ## Deployment
 

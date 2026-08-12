@@ -1,6 +1,5 @@
 import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';
-
 import { AppModule } from './app.module';
 
 describe('AppModule', () => {

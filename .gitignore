@@ -30,7 +30,7 @@ pnpm-debug.log*
 CLAUDE.local.md
 .claude/settings.local.json
 
-# Workflow output and source documents, see conventions/artifacts.convention.md
+# Workflow output and source documents, see .agents/conventions/artifacts.convention.md
 artifacts/
 .artifacts/
 .remember/
