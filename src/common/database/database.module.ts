@@ -2,12 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MongooseModule, MongooseModuleFactoryOptions } from '@nestjs/mongoose';
 import { IDatabaseConfig } from '@common/config';
-
-/** Fail a connection attempt rather than hanging when no server answers. */
-const SERVER_SELECTION_TIMEOUT_MS = 5_000;
-
-/** Upper bound on pooled connections per instance. */
-const MAX_POOL_SIZE = 20;
+import { MAX_POOL_SIZE, SERVER_SELECTION_TIMEOUT_MS } from './database.constants';
 
 /**
  * Owns the database connection.

@@ -1710,6 +1710,10 @@
       "description": "Closing and reopening accounting periods. A closed period is read only."
     },
     {
+      "name": "Plans",
+      "description": "Monthly spending targets, the plan side of the report."
+    },
+    {
       "name": "Audit log",
       "description": "The append only trail of changes to financial data."
     },

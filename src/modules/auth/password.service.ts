@@ -1,26 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { hash, verify } from '@node-rs/argon2';
-
-/**
- * Argon2 parameters.
- *
- * @remarks
- * The OWASP baseline: 19 MiB of memory, two iterations, one lane. Memory hardness
- * is what makes a stolen hash expensive to attack on a GPU, which a fast hash
- * like SHA-256 does not provide for an input as low in entropy as a password.
- *
- * The algorithm is deliberately not set here. This library's `Algorithm` enum is
- * an ambient const enum, which `isolatedModules` cannot read, and hardcoding its
- * numeric value would break silently if the library renumbered it. Argon2id is
- * the library default, and a test asserts the produced hash carries the
- * `$argon2id$` marker, so a change in that default fails loudly rather than
- * quietly downgrading every password to a weaker variant.
- */
-const ARGON2_OPTIONS = {
-  memoryCost: 19_456,
-  timeCost: 2,
-  parallelism: 1,
-};
+import { ARGON2_OPTIONS } from './auth.constants';
 
 /**
  * Hashes and verifies passwords.

@@ -1,62 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import { SwaggerTheme, SwaggerThemeNameEnum } from 'swagger-themes';
-import { CaseInsensitiveSearchPlugin } from './plugins';
-
-/**
- * Behaviour of the documentation UI.
- *
- * @property filter - Shows the operations search box.
- * @property showRequestDuration - Reports how long a try-it-out call took.
- * @property persistAuthorization - Keeps a pasted bearer token across reloads.
- * @property tagsSorter - Sorts tags alphabetically rather than by declaration order.
- * @property operationsSorter - Sorts operations alphabetically within a tag.
- * @property plugins - UI plugins, currently the case insensitive filter.
- */
-const SWAGGER_UI_OPTIONS = {
-  filter: true,
-  showRequestDuration: true,
-  persistAuthorization: true,
-  tagsSorter: 'alpha',
-  operationsSorter: 'alpha',
-  plugins: [CaseInsensitiveSearchPlugin],
-};
-
-/**
- * Prose shown at the top of the documentation, describing the rules a client
- * cannot infer from the schemas alone.
- */
-const API_DESCRIPTION = `Monthly spending targets, logged actuals, and variance reporting with locked periods.
-
-**Money** is an integer count of minor units. A field ending in \`Minor\` holds cents.
-
-**Months** are the string \`YYYY-MM\`.
-
-**Variance** is \`actual - plan\`. Variance percent is \`null\` when the plan is zero, never \`NaN\`.
-
-**Missing actuals** default to \`0\`. Pass \`missingActuals=null\` to receive \`null\` instead. Every report row carries \`hasActual\`, so a logged zero is never confused with nothing logged.
-
-**Locked periods** reject writes with \`423\` and the code \`PERIOD_LOCKED\`.
-
-**Deletes are soft.** A \`DELETE\` answers \`204\` and the record stops appearing in reads.
-
-**Sessions** travel in the \`Authorization\` header, never a cookie, so a mobile or desktop client is a first class caller. Access tokens are RS256 signed and short lived; refresh tokens are opaque, single use, and rotate.`;
-
-/**
- * The groups operations are organised into, with what each one is for.
- *
- * @remarks
- * A tag used by a controller but not declared here still groups correctly, but
- * its group has no description. Declaring them means the sidebar explains itself.
- */
-const API_TAGS: { name: string; description: string }[] = [
-  { name: 'Auth', description: 'Establishing, renewing, and ending sessions.' },
-  { name: 'Account', description: 'The signed in account and the settings reports are computed against.' },
-  { name: 'Categories', description: 'The shared catalogue and the account’s own categories.' },
-  { name: 'Period locks', description: 'Closing and reopening accounting periods. A closed period is read only.' },
-  { name: 'Audit log', description: 'The append only trail of changes to financial data.' },
-  { name: 'Health', description: 'Liveness and readiness probes.' },
-];
+import { API_DESCRIPTION, API_TAGS, SWAGGER_UI_OPTIONS } from './swagger.constants';
 
 /**
  * Builds the OpenAPI document description.

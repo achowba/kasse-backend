@@ -2,10 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 import { AbstractDocument } from '@common/database';
 import { CurrencyEnum } from '@common/enums';
-
-/** Bounds on the month a fiscal year may start in. */
-const FIRST_MONTH = 1;
-const LAST_MONTH = 12;
+import { FIRST_MONTH, LAST_MONTH } from '../users.constants';
 
 /**
  * An account.

@@ -24,6 +24,23 @@
 - One exception, and it is deliberate: an identifier suffix keeps the conventional `Id` form, as in `userId`, `categoryId`, `requestId`. These are stored schema field names, so renaming them to `userID` would rename fields in every document for no gain, and `Id` is universal in this ecosystem.
 - File names stay kebab-case with a lowercase role suffix: `user-response.dto.ts`, not `user-response.DTO.ts`.
 
+## Constants live in their own file
+
+A module level constant does not sit at the top of a service, a repository, a controller, a DTO, a schema, or a module. It goes in a constants file beside them:
+
+```
+src/modules/plans/plans.constants.ts
+src/common/month/month.constants.ts
+```
+
+This is about where a value can be found and changed, not about tidiness. A limit, a timeout, a default, or a pattern is configuration expressed in code, and someone changing it should not have to know which of eight files it was declared in. Collecting them also makes it obvious when the same number has been written twice under different names.
+
+- Name the file after its folder: `<folder>.constants.ts`.
+- Export everything from it. A constant used by exactly one file still belongs there, because that is where the next person will look.
+- Give each one a doc block saying what it governs and why it has that value. A number with no reason is a number nobody dares change.
+- A local inside a function is not a module constant and stays where it is.
+- Values shared across features go in `@common/constants`; values belonging to one feature stay in that feature's file.
+
 ## Async
 
 - `async`/`await` only. No `.then()` chains.

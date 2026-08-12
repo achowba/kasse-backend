@@ -1,9 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsOptional, IsString, Matches } from 'class-validator';
 import { MONTH_PATTERN, QUARTER_PATTERN } from '@common/month';
-
-/** Most months one request may close at once. A year and a quarter of slack. */
-const MAX_MONTHS_PER_REQUEST = 15;
+import { MAX_MONTHS_PER_REQUEST } from '../period-locks.constants';
 
 /**
  * The periods to close.

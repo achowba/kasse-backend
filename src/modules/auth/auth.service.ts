@@ -3,15 +3,13 @@ import { InjectConnection } from '@nestjs/mongoose';
 import { ClientSession, Connection, Types } from 'mongoose';
 import { withTransaction } from '@common/database';
 import { UserDocument, UserResponseDTO, UsersService } from '@modules/users';
+import { INVALID_CREDENTIALS } from './auth.constants';
 import { AuthResponseDTO } from './dto/auth-response.dto';
 import { CredentialsDTO } from './dto/credentials.dto';
 import { SessionResponseDTO } from './dto/session-response.dto';
 import { PasswordService } from './password.service';
 import { RefreshTokensRepository } from './refresh-tokens.repository';
 import { TokenService } from './token.service';
-
-/** One message for every credential failure, so responses reveal nothing. */
-const INVALID_CREDENTIALS = 'Invalid email or password.';
 
 /**
  * Signup, login, token rotation, and session management.

@@ -1,3 +1,4 @@
+export * from './categories.constants';
 export * from './categories.module';
 export * from './categories.service';
 export * from './categories.util';

@@ -5,32 +5,7 @@ import { Params } from 'nestjs-pino';
 import type { Level } from 'pino';
 import { IAppConfig } from '@common/config';
 import { NodeEnvEnum } from '@common/enums';
-
-/**
- * Fields scrubbed from every log line.
- *
- * @remarks
- * Redaction is configured once, at the logger, rather than at each call site.
- * A new call site therefore cannot leak a credential by forgetting to strip it.
- */
-const REDACTED_PATHS = [
-  'req.headers.authorization',
-  'req.headers.cookie',
-  'res.headers["set-cookie"]',
-  '*.password',
-  '*.passwordHash',
-  '*.token',
-  '*.accessToken',
-  '*.refreshToken',
-  '*.secret',
-  '*.apiKey',
-  'req.body.password',
-  'req.body.token',
-  'req.body.refreshToken',
-];
-
-/** Paths that are too noisy to log on every hit. */
-const UNLOGGED_PATHS = ['/api/v1/health', '/api/v1/health/ready', '/docs', '/docs-json'];
+import { REDACTED_PATHS, UNLOGGED_PATHS } from './logging.constants';
 
 /**
  * Reports whether the pretty printing transport is installed.

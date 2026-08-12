@@ -1,9 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, MaxLength, MinLength } from 'class-validator';
-
-/** A base64url encoded 32 byte token is 43 characters. Bound it either side of that. */
-const MINIMUM_TOKEN_LENGTH = 20;
-const MAXIMUM_TOKEN_LENGTH = 200;
+import { MAXIMUM_TOKEN_LENGTH, MINIMUM_TOKEN_LENGTH } from '../auth.constants';
 
 /**
  * A refresh token presented for exchange or revocation.

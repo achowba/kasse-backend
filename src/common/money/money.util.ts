@@ -1,11 +1,4 @@
-/** Minor units per major unit. Two decimal places, as every supported currency uses. */
-const MINOR_UNITS_PER_MAJOR = 100;
-
-/**
- * Accepted amount text: an optional sign, digits with optional thousands
- * separators, and at most two decimal places.
- */
-const AMOUNT_PATTERN = /^([+-]?)(\d{1,3}(?:,\d{3})*|\d+)(?:\.(\d{1,2}))?$/;
+import { AMOUNT_PATTERN, MINOR_UNITS_PER_MAJOR } from './money.constants';
 
 /**
  * Parses an amount written by a person into minor units.
