@@ -1,21 +1,31 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+import { ConfigService } from '@nestjs/config';
+import { Logger } from 'nestjs-pino';
+import { IAppConfig } from '@common/config';
+import { bootstrapNestServer, initialiseNestApplication } from './bootstrap';
 
 /**
- * Boots the HTTP application.
+ * Boots the HTTP application and starts listening.
  *
- * Steps: build the Nest application from the root module, then bind the HTTP
- * server to the configured port.
- *
- * Platform concerns (configuration validation, structured logging, the global
- * error filter, API documentation) are added to this bootstrap in the platform
- * module rather than here, so this function stays a single readable sequence.
+ * @steps
+ * 1. Create the application with its logs buffered.
+ * 2. Install the pino logger and flush the buffered lines through it, so the
+ *    boot sequence is recorded in the same format as everything after it.
+ * 3. Apply the server bootstrap: middleware, versioning, validation, docs.
+ * 4. Listen on the configured port.
  *
  * @returns A promise that resolves once the server is accepting connections.
  */
-async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
-  await app.listen(process.env['PORT'] ?? 3000);
-}
+const bootstrap = async (): Promise<void> => {
+  const app = await initialiseNestApplication();
+
+  app.useLogger(app.get(Logger));
+  app.flushLogs();
+
+  bootstrapNestServer(app);
+
+  const config = app.get(ConfigService).getOrThrow<IAppConfig>('app');
+
+  await app.listen(config.port);
+};
 
 void bootstrap();

@@ -1,30 +1,8 @@
 # Documentation convention
 
-## TSDoc
+## Doc blocks
 
-Every function and method carries TSDoc. No exceptions for short ones: a short function still has a reason to exist that its body does not state.
-
-A block says what it does, the steps it takes when they are not obvious, and why it exists where the reason is not self evident.
-
-```ts
-/**
- * Rejects the write when the month is locked.
- *
- * Reads the lock for this user and month, and throws when one exists. Every
- * mutating path calls this so lock enforcement lives in one place and no route
- * can bypass it.
- *
- * @param userId - The authenticated user whose period is being checked.
- * @param month - The month under check, as `YYYY-MM`.
- * @param session - Optional transaction session, so the check and the write it
- *   guards read the same snapshot.
- * @throws PeriodLockedException When a lock exists for that user and month.
- */
-```
-
-- Document every parameter with `@param`, the result with `@returns`, and every exception a caller can expect with `@throws`.
-- Describe behaviour, not implementation. A caller reads the block to decide whether to call it.
-- Update the block in the same edit as the code. A stale comment is worse than none, because it is trusted.
+See [tsdoc](tsdoc.convention.md). It covers where a block goes, which tags exist, and what it must say.
 
 ## Comments in the body
 

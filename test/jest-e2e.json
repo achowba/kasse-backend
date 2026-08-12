@@ -3,8 +3,13 @@
   "rootDir": ".",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
+  "setupFiles": ["<rootDir>/jest.setup.ts"],
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "moduleNameMapper": {
+    "^@common/(.*)$": "<rootDir>/src/common/$1",
+    "^@modules/(.*)$": "<rootDir>/src/modules/$1"
   },
   "clearMocks": true,
   "restoreMocks": true

@@ -13,7 +13,7 @@
 | Create | `POST`, `201` |
 | Full replace or upsert by natural key | `PUT`, `200` |
 | Partial update | `PATCH`, `200` |
-| Delete or archive | `DELETE`, `204` |
+| Delete or archive | `DELETE`, `204`. Always a soft delete server side. |
 | Read | `GET`, `200` |
 | Validation failure | `400` |
 | Missing or invalid credentials | `401` |

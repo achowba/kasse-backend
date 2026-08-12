@@ -27,10 +27,29 @@
 - A uniqueness rule is a unique index, not a check in application code. One plan per user, category, and month is `unique { userId, categoryId, month }`.
 - A record with a natural expiry uses a TTL index rather than a cleanup job.
 
-## Lifecycle
+## Lifecycle: soft delete only
 
-- Financial records are archived, never hard deleted. A locked period must keep resolving the names it referenced.
-- A category carries `archivedAt`. Archiving hides it from pickers and leaves history intact.
+Nothing in this system hard deletes data. A delete is a state change, not a removal.
+
+- Every domain collection carries `deletedAt`, a nullable timestamp. A delete sets it. Nothing unsets it except an explicit, audited restore.
+- `deleteOne`, `deleteMany`, `findOneAndDelete`, `remove`, and `drop` do not appear in application code. Treat their presence in a diff as a defect.
+- The repository layer excludes soft deleted records from every read by default. A caller that genuinely needs them asks for them explicitly, and that path exists only for audit and restore.
+- A `DELETE` endpoint still answers `204`. The record is gone from the caller's point of view. Whether the row survives is the database's business, not the client's.
+- A soft deleted record keeps its unique index entries. Where a name must become reusable after deletion, make the unique index partial on `deletedAt: null` rather than reaching for a hard delete.
+- Deleting is audited like any other change to financial data, with the before value recorded.
+
+Why: this is a financial system. A locked period must keep resolving the category names it referenced, a report run last quarter must still reproduce, and an incorrect delete must be recoverable without a database restore. A hard delete destroys the audit trail it was supposed to be protected by.
+
+A category uses `archivedAt` in addition to `deletedAt`. Archiving hides it from pickers while keeping it selectable in history; deleting removes it from the product entirely. They are different states and both are reversible.
+
+### The two exceptions
+
+Both are ephemeral records with no business meaning, and both are documented where they are defined:
+
+1. **TTL managed credentials and keys.** Refresh tokens and idempotency keys expire through a TTL index. They are transient session state, not data a user owns.
+2. **Development seeding.** A seed script may reset a local or test database. It never runs against a deployed environment.
+
+The audit log itself is neither updated nor deleted, softly or otherwise. It is append only.
 
 ## Locking
 

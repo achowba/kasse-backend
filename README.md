@@ -12,6 +12,7 @@ Backend API for tracking monthly spending targets against actual spend, with var
   - [Money and months](#money-and-months)
   - [Variance](#variance)
   - [Missing actuals](#missing-actuals)
+  - [Deletion](#deletion)
   - [Locking](#locking)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
@@ -39,7 +40,7 @@ The API is client agnostic. It speaks JSON over REST, carries sessions in the `A
 | Conventions, commit tooling, agent index | Done |
 | Container image and compose stack | Done |
 | PR template and agent skills | Done |
-| Platform layer: config, logging, errors, docs, health | Not started |
+| Platform layer: config, logging, errors, docs, health | Done |
 | Core domain: months, money, variance, pagination | Not started |
 | Auth and sessions | Not started |
 | Audit log | Not started |
@@ -62,7 +63,7 @@ The API is client agnostic. It speaks JSON over REST, carries sessions in the `A
 | Runtime | Node.js 22 LTS | Current LTS. Pinned in `.nvmrc` and `engines`. |
 | Language | TypeScript 5.7, `strict: true` | No implicit `any`, no unchecked index access. See `.agents/conventions/code-standards.convention.md`. |
 | Framework | NestJS 11 | Module boundaries, dependency injection, and first party support for validation, documentation, and health checks. |
-| Database | MongoDB 8 with Mongoose 8 | Document model fits sparse plan and actual grids. Aggregation does the report in one round trip. |
+| Database | MongoDB 8 with Mongoose 9 | Document model fits sparse plan and actual grids. Aggregation does the report in one round trip. |
 | Tests | Jest 30, Supertest, mongodb-memory-server | Unit tests beside their source, end to end tests against a real in process replica set. |
 | Docs | Swagger via `@nestjs/swagger` | Generated from the DTOs, exported to `openapi.json` for the web client. |
 
@@ -103,6 +104,14 @@ Percentages are rounded to two decimal places.
 When a category has a plan for a month but nothing logged against it, the report's default is to treat the actual as `0`, which makes the variance the full negative of the plan. Pass `?missingActuals=null` to get `null` for the actual, the variance, and the percentage instead, so the client can render a dash.
 
 Either way the response carries `hasActual`, so a real logged `0` is never confused with nothing logged.
+
+### Deletion
+
+Nothing is hard deleted. A `DELETE` sets `deletedAt` and the record stops appearing in reads; the row survives. From a client's point of view the record is gone, and the endpoint still answers `204`.
+
+This is a financial system: a locked period has to keep resolving the category names it referenced, a report run last quarter has to reproduce, and a mistaken delete has to be recoverable without a database restore. A hard delete would destroy the audit trail that exists to protect against exactly that.
+
+Two things are exempt, both ephemeral and neither owned by a user: refresh tokens and idempotency keys expire through a TTL index, and the seed script may reset a local database. The audit log is append only and is never modified at all.
 
 ### Locking
 
@@ -179,7 +188,7 @@ Both are deterministic. Neither uses unseeded randomness, so test expectations s
 
 ## API documentation
 
-Swagger UI is served at `/docs` and the raw document at `/docs-json`. The committed `openapi.json` is the contract the web client generates its types from, and it is regenerated whenever a DTO changes.
+Swagger UI is served at `/docs`, dark themed, with a case insensitive operation filter. The raw document is at `/docs-json`. Neither is mounted in production or test. The committed `openapi.json` is the contract the web client generates its types from, and it is regenerated whenever a DTO changes.
 
 All routes are versioned under `/api/v1`. Every list endpoint paginates and returns `{ items, pagination: { limit, offset, total } }`. Every error shares one envelope:
 
@@ -276,7 +285,7 @@ A deployed environment takes its secrets from the platform's secret store, never
 |---|---|
 | One currency per user | The assignment's data has no currency column. Per record currency would need an exchange rate policy to make totals meaningful, which is a larger product decision than this exercise implies. |
 | Negative actuals are allowed | Credit notes and refunds are real. Plan targets must be zero or positive. |
-| Categories are archived, never deleted | A locked period must keep resolving its category names. A hard delete would break history. |
+| No data is ever hard deleted | Deletes set `deletedAt` and reads exclude those rows. A category also has a separate `archivedAt`, because hiding it from a picker while keeping it selectable in history is a different state from deleting it. |
 | System categories are shared, not copied | A catalogue row with no owner is readable by every user, so signup does not duplicate 40 rows per account. Users add their own categories on top and cannot edit the shared ones. |
 | No queue or Redis | Nothing in this workload is long running. A CSV of a few thousand rows validates and writes well inside a request. Adding a broker would add a deployed service and a polling contract for no measured gain. The threshold that would change this is recorded below. |
 | Audit records carry no IP or user agent | They are personal identifiers, and the logging convention forbids persisting them. The audit log answers what changed and by which account, which is what a financial trail needs. |

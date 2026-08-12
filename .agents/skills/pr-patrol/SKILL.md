@@ -1,9 +1,9 @@
 ---
-name: pull-patrol
+name: pr-patrol
 description: Reviews a pull request diff against this repo's conventions, its checklist, and the saved implementation plan, then writes a severity rated review. Use before merging, or to review someone else's branch.
 ---
 
-# pull-patrol
+# pr-patrol
 
 ## Purpose
 
