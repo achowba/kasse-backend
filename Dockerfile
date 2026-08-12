@@ -15,7 +15,10 @@ RUN npm run build
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+# --ignore-scripts skips lifecycle hooks that only make sense in a checkout,
+# such as husky installing git hooks, and avoids running arbitrary package
+# install scripts in the image.
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 # Runtime stage.
 FROM node:22-alpine AS runtime

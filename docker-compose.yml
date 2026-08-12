@@ -48,6 +48,12 @@ services:
       # as localhost:27017 and that address means nothing inside this container.
       MONGODB_URI: mongodb://mongo:27017/plan_vs_actual?directConnection=true
       PORT: 3000
+      # Overrides NODE_ENV from .env, which is development on a workstation. This
+      # container runs the production image, which has no dev dependencies, so
+      # development mode would try to load a pretty printer that is not there.
+      # Staging keeps JSON logs and the strict CORS allowlist, and still serves
+      # the documentation UI.
+      NODE_ENV: staging
     ports:
       - '3000:3000'
     depends_on:
