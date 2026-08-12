@@ -1,0 +1,30 @@
+# Local MongoDB for development and manual testing.
+#
+# The server runs as a single node replica set because the CSV import writes all
+# rows in one transaction, and MongoDB transactions require a replica set. The
+# healthcheck initiates the set on its first run, so no manual step is needed.
+services:
+  mongo:
+    image: mongo:8
+    container_name: pva-mongo
+    restart: unless-stopped
+    command: ['--replSet', 'rs0', '--bind_ip_all']
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: >
+        mongosh --quiet --eval "
+          try { rs.status().ok }
+          catch (err) {
+            rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'localhost:27017' }] }).ok
+          }
+        "
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+
+volumes:
+  mongo-data:

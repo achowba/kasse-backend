@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Tests and coverage
+coverage/
+.nyc_output/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Editor and OS
+.DS_Store
+.idea/
+*.swp
+
+# Local agent instructions
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Workflow output and source documents, see conventions/artifacts.convention.md
+artifacts/
+.artifacts/
+.remember/
