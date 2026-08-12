@@ -26,7 +26,9 @@ jobs:
 
       - run: npm run typecheck
 
-      - run: npm test
+      # Coverage rather than a plain run, so the thresholds in package.json are
+      # enforced here rather than being advisory.
+      - run: npm run test:cov
 
       # The end to end suite starts a real mongod as a single node replica set.
       # Caching the binary keeps a ~100MB download off every run.
