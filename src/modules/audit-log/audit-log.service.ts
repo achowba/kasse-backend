@@ -69,8 +69,8 @@ export class AuditLogService implements OnApplicationShutdown {
   /** Entries accepted but not yet written. */
   private readonly buffer: Partial<AuditEntry>[] = [];
 
-  /** True while {@link AuditLogService.flush} is draining, so only one drain runs at a time. */
-  private draining = false;
+  /** The drain in flight, so a concurrent caller joins it rather than starting a second one. */
+  private drain: Promise<void> | null = null;
 
   /** True when a drain is already queued for the next tick, so a burst schedules one. */
   private scheduled = false;
@@ -131,33 +131,62 @@ export class AuditLogService implements OnApplicationShutdown {
    * otherwise be able to miss a change the same instance had just accepted.
    *
    * @steps
-   * 1. Return early when a drain is already running, so concurrent callers do not
-   *    write the same entries twice.
-   * 2. Take entries in batches until the buffer is empty, re-reading its length
-   *    each pass so entries arriving mid drain are included.
-   * 3. Log a failed batch in full and continue. Retrying would loop forever
-   *    against a database that is down, and dropping silently would leave a gap
-   *    nobody could see.
+   * 1. Wait for any drain already in flight. Returning early instead would tell
+   *    the caller the buffer is empty when it is only in the process of
+   *    emptying, which is precisely the race the read endpoint calls this to
+   *    avoid.
+   * 2. Return when there is nothing left, so the common case costs no work.
+   * 3. Otherwise start a drain and publish it, so a caller arriving meanwhile
+   *    joins this one rather than writing the same entries twice.
    */
   async flush(): Promise<void> {
-    if (this.draining) {
+    const inFlight = this.drain;
+
+    if (inFlight !== null) {
+      await inFlight;
+    }
+
+    if (this.buffer.length === 0) {
       return;
     }
 
-    this.draining = true;
+    const drain = this.drainBuffer();
+
+    this.drain = drain;
 
     try {
-      while (this.buffer.length > 0) {
-        const batch = this.buffer.splice(0, AUDIT_FLUSH_BATCH_SIZE);
-
-        try {
-          await this.auditLogRepository.appendMany(batch);
-        } catch (error: unknown) {
-          this.logger.error({ err: error, entries: batch }, 'audit entries could not be written, logged instead');
-        }
-      }
+      await drain;
     } finally {
-      this.draining = false;
+      // Only clear it when it is still this drain. A later caller may already
+      // have published its own, and nulling that one would let a third caller
+      // start a duplicate.
+      if (this.drain === drain) {
+        this.drain = null;
+      }
+    }
+  }
+
+  /**
+   * Writes the buffer out in batches.
+   *
+   * @remarks
+   * Never rejects. A failed batch is logged in full and the drain continues:
+   * retrying would loop forever against a database that is down, and dropping
+   * silently would leave a gap nobody could see.
+   *
+   * The loop re-reads the buffer length each pass, so entries that arrive while
+   * a batch is being written are included in this drain rather than waiting for
+   * the next one.
+   */
+  private async drainBuffer(): Promise<void> {
+    while (this.buffer.length > 0) {
+      const batch = this.buffer.splice(0, AUDIT_FLUSH_BATCH_SIZE);
+
+      try {
+        await this.auditLogRepository.appendMany(batch);
+      } catch (error: unknown) {
+        this.logger.error({ err: error, entries: batch }, 'audit entries could not be written, logged instead');
+      }
     }
   }
 
@@ -250,7 +279,7 @@ export class AuditLogService implements OnApplicationShutdown {
    * Losing the trail is survivable; taking the API down to do it is not.
    */
   private scheduleDrain(): void {
-    if (this.scheduled || this.draining) {
+    if (this.scheduled) {
       return;
     }
 

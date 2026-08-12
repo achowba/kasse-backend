@@ -155,6 +155,47 @@ describe('AuditLogService', () => {
     });
   });
 
+  describe('concurrent flushes', () => {
+    it('waits for a drain already in flight rather than returning while it is still writing', async () => {
+      let releaseWrite = (): void => undefined;
+      repository.appendMany.mockReturnValue(
+        new Promise<void>((resolve) => {
+          releaseWrite = (): void => {
+            resolve();
+          };
+        }),
+      );
+
+      service.record({ userId, action: AuditActionEnum.PLAN_CREATED, entity: AuditEntityEnum.PLAN });
+
+      const first = service.flush();
+      let secondResolved = false;
+      const second = service.flush().then(() => {
+        secondResolved = true;
+      });
+
+      await Promise.resolve();
+
+      // The second caller must still be waiting. Resolving here would tell it
+      // the buffer is empty while the write is in fact still in flight, which
+      // is the race the trail's read endpoint calls flush to avoid.
+      expect(secondResolved).toBe(false);
+
+      releaseWrite();
+      await Promise.all([first, second]);
+
+      expect(secondResolved).toBe(true);
+    });
+
+    it('does not write the same entry twice when two callers flush at once', async () => {
+      service.record({ userId, action: AuditActionEnum.PLAN_CREATED, entity: AuditEntityEnum.PLAN });
+
+      await Promise.all([service.flush(), service.flush()]);
+
+      expect(repository.appendMany.mock.calls.flatMap((call) => call[0])).toHaveLength(1);
+    });
+  });
+
   describe('writing inside a transaction', () => {
     it('uses the session, so a rolled back change leaves no entry claiming it happened', async () => {
       const session = { id: 'session' } as never;
