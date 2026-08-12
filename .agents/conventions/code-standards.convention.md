@@ -56,6 +56,16 @@ This is about where a value can be found and changed, not about tidiness. A limi
 - Constructor injection only. Do not reach for a module level singleton or a service locator.
 - Dead code is deleted, not commented out. Git holds the history.
 
+## No circular dependencies
+
+`npm run lint:circular` runs `madge` over `src` and fails on any cycle. It runs in CI beside the linter.
+
+A cycle between two modules compiles, passes the type checker, and passes unit tests that mock the other side. It fails at runtime instead, as an injected dependency that is `undefined`, at whichever call site happens to run first. That failure names neither module involved, which is why this needs a tool rather than review.
+
+Barrel files make cycles easy to create without noticing: importing `@modules/categories` pulls in everything that barrel re-exports, not the one class named. When a cycle appears, the fix is usually that a shared type belongs in `common/`, or that one direction should be an event rather than a call. Deleting the barrel import in favour of a deep path hides the cycle from a reader while leaving it in place, so it is not a fix.
+
+`import type` is excluded, because a type-only import is erased before it can form a runtime cycle.
+
 ## Immutability
 
 - `const` unless reassignment is required.
