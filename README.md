@@ -41,6 +41,7 @@ The API is client agnostic. It speaks JSON over REST, carries sessions in the `A
 | Container image and compose stack | Done |
 | PR template and agent skills | Done |
 | Platform layer: config, logging, errors, docs, health | Done |
+| Persistence: connection, tenant scoped repository, transactions | Done |
 | Core domain: months, money, variance, pagination | Not started |
 | Auth and sessions | Not started |
 | Audit log | Not started |
@@ -241,7 +242,7 @@ npm run typecheck  # tsc --noEmit
 
 Unit tests sit beside their source as `{name}.spec.ts` and mock external dependencies, including Mongoose models. Each service and utility covers the happy path, validation failures, and edge cases such as an empty range, a plan of zero, an absent actual, and malformed CSV rows.
 
-End to end tests cover the three behaviours the assignment names: the report's numbers match the stored sample data, a locked month rejects edits, and CSV import validates and replays idempotently.
+End to end tests run against a real MongoDB. A Jest `globalSetup` starts one in-memory replica set for the whole run and puts its connection string in the environment before any test file loads, which matters because the application validates its configuration at import time. They will cover the three behaviours the assignment names: the report's numbers match the stored sample data, a locked month rejects edits, and CSV import validates and replays idempotently.
 
 ## Project structure
 

@@ -3,7 +3,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule, Params } from 'nestjs-pino';
-import { appConfig, IAppConfig, validateEnvironment } from '@common/config';
+import { appConfig, databaseConfig, IAppConfig, validateEnvironment } from '@common/config';
+import { DatabaseModule } from '@common/database';
 import { buildLoggerOptions } from '@common/logging';
 import { HealthModule } from '@modules/health';
 
@@ -27,10 +28,11 @@ const THROTTLE_LIMIT = 120;
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig],
+      load: [appConfig, databaseConfig],
       validate: validateEnvironment,
       cache: true,
     }),
+    DatabaseModule,
     LoggerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService): Params => buildLoggerOptions(configService.getOrThrow<IAppConfig>('app')),
