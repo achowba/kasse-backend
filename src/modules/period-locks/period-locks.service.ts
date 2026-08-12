@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ClientSession, Types } from 'mongoose';
+import { DataVersionService } from '@common/cache';
 import { compareMonths, isValidMonth, quarterMonths } from '@common/month';
 import { AuditActionEnum, AuditEntityEnum, AuditLogService } from '@modules/audit-log';
 import { CreatePeriodLockDTO } from './dto/create-period-lock.dto';
@@ -23,6 +24,7 @@ export class PeriodLocksService {
   constructor(
     private readonly periodLocksRepository: PeriodLocksRepository,
     private readonly auditLogService: AuditLogService,
+    private readonly dataVersionService: DataVersionService,
   ) {}
 
   /**
@@ -139,6 +141,13 @@ export class PeriodLocksService {
       }
     }
 
+    if (newlyLocked.length > 0) {
+      // A lock changes no amount, but it changes whether a report's periods are
+      // closed, and a client renders that. Bumping once for the whole call keeps
+      // a locked quarter from invalidating three times.
+      this.dataVersionService.bump(userId);
+    }
+
     return newlyLocked;
   }
 
@@ -166,6 +175,8 @@ export class PeriodLocksService {
     if (!(await this.periodLocksRepository.unlock(userId, month))) {
       throw new NotFoundException(`${month} is not locked.`);
     }
+
+    this.dataVersionService.bump(userId);
 
     this.auditLogService.record({
       userId,

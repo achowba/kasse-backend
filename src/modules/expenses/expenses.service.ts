@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ClientSession, QueryFilter, Types } from 'mongoose';
+import { DataVersionService } from '@common/cache';
 import { IPaginatedResponse, toPaginatedResponse } from '@common/pagination';
 import { AuditActionEnum, AuditEntityEnum, AuditLogService } from '@modules/audit-log';
 import { CategoriesService } from '@modules/categories';
@@ -31,6 +32,7 @@ export class ExpensesService {
     private readonly periodLocksService: PeriodLocksService,
     private readonly categoriesService: CategoriesService,
     private readonly auditLogService: AuditLogService,
+    private readonly dataVersionService: DataVersionService,
   ) {}
 
   /**
@@ -65,6 +67,8 @@ export class ExpensesService {
       source: ExpenseSourceEnum.MANUAL,
       importBatchId: null,
     });
+
+    this.dataVersionService.bump(userId);
 
     this.auditLogService.record({
       userId,
@@ -147,6 +151,8 @@ export class ExpensesService {
       throw new NotFoundException('Expense not found.');
     }
 
+    this.dataVersionService.bump(userId);
+
     this.auditLogService.record({
       userId,
       action: AuditActionEnum.EXPENSE_UPDATED,
@@ -195,6 +201,8 @@ export class ExpensesService {
     await this.periodLocksService.assertUnlocked(userId, existing.month);
     await this.expensesRepository.softDelete(userId, expenseId);
 
+    this.dataVersionService.bump(userId);
+
     this.auditLogService.record({
       userId,
       action: AuditActionEnum.EXPENSE_DELETED,
@@ -241,6 +249,11 @@ export class ExpensesService {
         await this.expensesRepository.create(userId, { ...row, source: ExpenseSourceEnum.CSV, importBatchId }, session),
       );
     }
+
+    // Once for the batch rather than once per row. The version only has to change,
+    // not change a particular number of times, and a thousand row file should not
+    // invalidate the cache a thousand times.
+    this.dataVersionService.bump(userId);
 
     return created;
   }

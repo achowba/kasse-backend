@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule, ThrottlerModuleOptions } from '@nestjs/throttler';
 import { LoggerModule, Params } from 'nestjs-pino';
+import { CacheModule } from '@common/cache';
 import { appConfig, authConfig, databaseConfig, IAppConfig, validateEnvironment } from '@common/config';
 import { DatabaseModule } from '@common/database';
 import { buildLoggerOptions } from '@common/logging';
@@ -13,6 +14,7 @@ import { ExpensesModule } from '@modules/expenses';
 import { HealthModule } from '@modules/health';
 import { PeriodLocksModule } from '@modules/period-locks';
 import { PlansModule } from '@modules/plans';
+import { ReportsModule } from '@modules/reports';
 import { UsersModule } from '@modules/users';
 
 /**
@@ -34,6 +36,7 @@ import { UsersModule } from '@modules/users';
       cache: true,
     }),
     DatabaseModule,
+    CacheModule,
     LoggerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService): Params => buildLoggerOptions(configService.getOrThrow<IAppConfig>('app')),
@@ -53,6 +56,7 @@ import { UsersModule } from '@modules/users';
     PeriodLocksModule,
     PlansModule,
     ExpensesModule,
+    ReportsModule,
     HealthModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

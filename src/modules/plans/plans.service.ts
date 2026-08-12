@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { QueryFilter, Types } from 'mongoose';
+import { DataVersionService } from '@common/cache';
 import { IPaginatedResponse, toPaginatedResponse } from '@common/pagination';
 import { AuditActionEnum, AuditEntityEnum, AuditLogService } from '@modules/audit-log';
 import { CategoriesService } from '@modules/categories';
@@ -28,6 +29,7 @@ export class PlansService {
     private readonly periodLocksService: PeriodLocksService,
     private readonly categoriesService: CategoriesService,
     private readonly auditLogService: AuditLogService,
+    private readonly dataVersionService: DataVersionService,
   ) {}
 
   /**
@@ -63,6 +65,8 @@ export class PlansService {
 
     const existing = await this.plansRepository.findForCell(userId, categoryId, input.month);
     const plan = await this.plansRepository.upsert(userId, categoryId, input.month, input.targetMinor);
+
+    this.dataVersionService.bump(userId);
 
     this.auditLogService.record({
       userId,
@@ -115,6 +119,8 @@ export class PlansService {
       throw new NotFoundException('Plan not found.');
     }
 
+    this.dataVersionService.bump(userId);
+
     this.auditLogService.record({
       userId,
       action: AuditActionEnum.PLAN_UPDATED,
@@ -159,6 +165,8 @@ export class PlansService {
 
     await this.periodLocksService.assertUnlocked(userId, existing.month);
     await this.plansRepository.softDelete(userId, planId);
+
+    this.dataVersionService.bump(userId);
 
     this.auditLogService.record({
       userId,
