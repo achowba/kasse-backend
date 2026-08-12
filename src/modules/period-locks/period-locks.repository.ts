@@ -17,7 +17,7 @@ export class PeriodLocksRepository extends BaseTenantRepository<PeriodLock> {
    * Reports whether a month is closed.
    *
    * @remarks
-   * The hottest read in the system: every write to a plan or an actual calls it,
+   * The hottest read in the system: every write to a plan or an expense calls it,
    * and a CSV import calls it once per distinct month. It is a covered existence
    * check on the unique index, so it stays cheap.
    *

@@ -139,7 +139,7 @@ export class CategoriesService implements OnApplicationBootstrap {
 
     const category = await this.categoriesRepository.create(userId, input.name.trim(), slug);
 
-    await this.auditLogService.record({
+    this.auditLogService.record({
       userId,
       action: AuditActionEnum.CATEGORY_CREATED,
       entity: AuditEntityEnum.CATEGORY,
@@ -201,7 +201,7 @@ export class CategoriesService implements OnApplicationBootstrap {
       throw new NotFoundException('Category not found.');
     }
 
-    await this.auditLogService.record({
+    this.auditLogService.record({
       userId,
       action: AuditActionEnum.CATEGORY_UPDATED,
       entity: AuditEntityEnum.CATEGORY,
@@ -218,7 +218,7 @@ export class CategoriesService implements OnApplicationBootstrap {
    * Soft deletes a category the caller owns.
    *
    * @remarks
-   * The record survives, so plans and actuals in a locked period keep resolving
+   * The record survives, so plans and expenses in a locked period keep resolving
    * the name they referenced. Archiving is the gentler option and is what a user
    * usually wants: it hides the category from pickers while leaving it selectable
    * in history.
@@ -237,7 +237,7 @@ export class CategoriesService implements OnApplicationBootstrap {
 
     await this.categoriesRepository.softDelete(userId, id);
 
-    await this.auditLogService.record({
+    this.auditLogService.record({
       userId,
       action: AuditActionEnum.CATEGORY_DELETED,
       entity: AuditEntityEnum.CATEGORY,

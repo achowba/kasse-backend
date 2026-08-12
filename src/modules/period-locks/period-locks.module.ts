@@ -10,7 +10,7 @@ import { PeriodLock, PeriodLockSchema } from './schemas/period-lock.schema';
  * Closed accounting periods, and the gate that enforces them.
  *
  * @remarks
- * Exports {@link PeriodLocksService} because plans, actuals, and the CSV import
+ * Exports {@link PeriodLocksService} because plans, expenses, and the CSV import
  * all call its gate before writing. That is the whole reason the enforcement
  * lives in a service rather than in a guard: an import writes rows without ever
  * passing through a route for each one.

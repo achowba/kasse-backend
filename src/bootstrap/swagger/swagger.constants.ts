@@ -25,7 +25,7 @@ export const SWAGGER_UI_OPTIONS = {
  * only looks at the shapes would not learn that a zero plan yields a null
  * percentage, or that a delete is soft.
  */
-export const API_DESCRIPTION = `Monthly spending targets, logged actuals, and variance reporting with locked periods.
+export const API_DESCRIPTION = `Monthly spending targets, logged expenses, and variance reporting with locked periods.
 
 **Money** is an integer count of minor units. A field ending in \`Minor\` holds cents.
 

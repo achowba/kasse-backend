@@ -23,7 +23,7 @@ export class UpdateCategoryDTO {
 
   @ApiPropertyOptional({
     description:
-      'Hide the category from pickers without removing it. Existing plans and actuals keep resolving it, and reports are unaffected.',
+      'Hide the category from pickers without removing it. Existing plans and expenses keep resolving it, and reports are unaffected.',
     example: true,
   })
   @IsOptional()

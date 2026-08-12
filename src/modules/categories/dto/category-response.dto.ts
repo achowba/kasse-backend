@@ -4,13 +4,13 @@ import { CategoryDocument } from '../schemas/category.schema';
 /**
  * A category, as returned to a caller who can select it.
  *
- * @property id - Identifier, used when creating a plan or an actual.
+ * @property id - Identifier, used when creating a plan or an expense.
  * @property name - The name as written.
  * @property shared - Whether it comes from the shared catalogue. Shared categories cannot be changed.
  * @property archived - Whether it is hidden from pickers while remaining selectable in history.
  */
 export class CategoryResponseDTO {
-  @ApiProperty({ description: 'Identifier, used when creating a plan or an actual.', example: '65f1c2d3e4b5a6c7d8e9f0a1' })
+  @ApiProperty({ description: 'Identifier, used when creating a plan or an expense.', example: '65f1c2d3e4b5a6c7d8e9f0a1' })
   id!: string;
 
   @ApiProperty({ description: 'The name as written.', example: 'Cloud Hosting' })

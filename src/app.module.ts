@@ -9,6 +9,7 @@ import { buildLoggerOptions } from '@common/logging';
 import { AuditLogModule } from '@modules/audit-log';
 import { AuthModule } from '@modules/auth';
 import { CategoriesModule } from '@modules/categories';
+import { ExpensesModule } from '@modules/expenses';
 import { HealthModule } from '@modules/health';
 import { PeriodLocksModule } from '@modules/period-locks';
 import { PlansModule } from '@modules/plans';
@@ -51,6 +52,7 @@ import { UsersModule } from '@modules/users';
     CategoriesModule,
     PeriodLocksModule,
     PlansModule,
+    ExpensesModule,
     HealthModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

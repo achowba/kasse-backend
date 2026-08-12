@@ -16,7 +16,7 @@ The query and response shapes every list endpoint shares.
 
 **`total` counts the whole filtered set, not the page.** A client cannot compute how many pages exist otherwise, and a report's totals would disagree with its own table. In the report this is done with a single `$facet`, so the rows and the total come from one pass over the same data.
 
-Paging is offset based rather than cursor based. The collections here are one user's own categories, plans, and actuals: small, and read with a sort the user chose. A cursor would buy stability under concurrent writes that this data does not experience.
+Paging is offset based rather than cursor based. The collections here are one user's own categories, plans, and expenses: small, and read with a sort the user chose. A cursor would buy stability under concurrent writes that this data does not experience.
 
 ## How it relates to the rest of the project
 

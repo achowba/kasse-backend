@@ -44,6 +44,13 @@ export class AuthService {
   /**
    * Registers an account and starts a session.
    *
+   * @steps
+   * 1. Reject the address when it already belongs to a live account.
+   * 2. Hash the password, which is deliberately slow.
+   * 3. Create the account.
+   * 4. Issue the first token pair, so a client is signed in without a second
+   *    round trip to login.
+   *
    * @param credentials - The email and password to register.
    * @returns The new account and its first token pair.
    * @throws ConflictException When the address already belongs to a live account.
@@ -71,6 +78,15 @@ export class AuthService {
    * unknown address path still runs a hash. Returning early would make a missing
    * account measurably faster to reject and turn the endpoint into an address
    * oracle.
+   *
+   * @steps
+   * 1. Look the address up.
+   * 2. When there is no account, hash the supplied password anyway and reject.
+   *    The hash is the whole point of this step: it costs what a real check
+   *    costs, so both paths take the same time.
+   * 3. Verify the password against the stored hash and reject on mismatch, with
+   *    the same message as step 2.
+   * 4. Issue a token pair.
    *
    * @param credentials - The email and password to check.
    * @returns The account and a new token pair.
@@ -100,6 +116,18 @@ export class AuthService {
    * @remarks
    * The revoke and the issue run in one transaction, so a failure between them
    * cannot leave a session with no usable refresh token.
+   *
+   * @steps
+   * 1. Hash the presented token and look the record up by that hash. The token
+   *    itself is never stored, so this is the only way to find it.
+   * 2. Reject an unknown token.
+   * 3. When the token was already revoked, treat it as a leak: revoke the entire
+   *    family and reject. This check comes before the expiry check on purpose,
+   *    because a replayed token that has also expired is still a leak.
+   * 4. Reject an expired token.
+   * 5. Reject when the account behind it is gone.
+   * 6. In one transaction, retire the presented token and issue a new pair in the
+   *    same family.
    *
    * @param presentedToken - The refresh token as presented by the client.
    * @returns The account and a new token pair.
@@ -213,6 +241,13 @@ export class AuthService {
 
   /**
    * Issues a token pair and records the refresh token.
+   *
+   * @steps
+   * 1. Sign a short lived access token.
+   * 2. Generate an opaque refresh token, which returns the token and its hash.
+   * 3. Store only the hash, under the continuing family or a new one.
+   * 4. Return the token itself, which is the only moment it exists outside the
+   *    client.
    *
    * @param user - The account the session belongs to.
    * @param familyId - The rotation chain to continue. Omitted starts a new chain, which is what a fresh login does.

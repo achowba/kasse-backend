@@ -1,4 +1,6 @@
+import { Logger } from '@nestjs/common';
 import { Types } from 'mongoose';
+import { AUDIT_BUFFER_LIMIT } from './audit-log.constants';
 import { AuditActionEnum, AuditEntityEnum } from './audit-log.enums';
 import { AuditLogRepository } from './audit-log.repository';
 import { AuditLogService } from './audit-log.service';
@@ -19,23 +21,32 @@ const buildEntry = (): AuditEntryDocument =>
 
 describe('AuditLogService', () => {
   const userId = new Types.ObjectId();
-  let repository: jest.Mocked<Pick<AuditLogRepository, 'append' | 'list'>>;
+  let repository: jest.Mocked<Pick<AuditLogRepository, 'append' | 'appendMany' | 'list'>>;
   let service: AuditLogService;
 
   beforeEach(() => {
     repository = {
       append: jest.fn().mockResolvedValue(buildEntry()),
+      appendMany: jest.fn().mockResolvedValue(undefined),
       list: jest.fn().mockResolvedValue({ entries: [buildEntry()], total: 1 }),
     };
 
     service = new AuditLogService(repository as unknown as AuditLogRepository);
   });
 
-  describe('record', () => {
-    it('stores both sides of the change, which is what makes the trail answer what changed', async () => {
+  describe('accepting an entry', () => {
+    it('returns without waiting for the write, so a slow trail cannot slow a change', () => {
+      service.record({ userId, action: AuditActionEnum.PLAN_CREATED, entity: AuditEntityEnum.PLAN });
+
+      // The caller has already returned while nothing has been written yet. That
+      // is the whole point: the change it describes is committed either way.
+      expect(repository.appendMany).not.toHaveBeenCalled();
+    });
+
+    it('writes what it accepted once flushed', async () => {
       const entityId = new Types.ObjectId();
 
-      await service.record({
+      service.record({
         userId,
         action: AuditActionEnum.PLAN_UPDATED,
         entity: AuditEntityEnum.PLAN,
@@ -45,9 +56,11 @@ describe('AuditLogService', () => {
         requestId: 'req-1',
       });
 
-      expect(repository.append).toHaveBeenCalledWith(
-        userId,
+      await service.flush();
+
+      expect(repository.appendMany).toHaveBeenCalledWith([
         expect.objectContaining({
+          userId,
           action: AuditActionEnum.PLAN_UPDATED,
           entity: AuditEntityEnum.PLAN,
           entityId,
@@ -55,57 +68,137 @@ describe('AuditLogService', () => {
           after: { targetMinor: 600_000 },
           requestId: 'req-1',
         }),
-        undefined,
-      );
+      ]);
+    });
+
+    it('writes a burst as one batch rather than one insert each', async () => {
+      service.record({ userId, action: AuditActionEnum.PLAN_CREATED, entity: AuditEntityEnum.PLAN });
+      service.record({ userId, action: AuditActionEnum.EXPENSE_CREATED, entity: AuditEntityEnum.EXPENSE });
+      service.record({ userId, action: AuditActionEnum.PERIOD_LOCKED, entity: AuditEntityEnum.PERIOD_LOCK });
+
+      await service.flush();
+
+      expect(repository.appendMany).toHaveBeenCalledTimes(1);
+      expect(repository.appendMany.mock.calls[0]?.[0]).toHaveLength(3);
     });
 
     it('records a creation with no before state', async () => {
-      await service.record({
+      service.record({
         userId,
         action: AuditActionEnum.PLAN_CREATED,
         entity: AuditEntityEnum.PLAN,
         after: { targetMinor: 500_000 },
       });
 
-      expect(repository.append).toHaveBeenCalledWith(userId, expect.objectContaining({ before: null }), undefined);
+      await service.flush();
+
+      expect(repository.appendMany).toHaveBeenCalledWith([expect.objectContaining({ before: null })]);
     });
 
     it('records a deletion with no after state', async () => {
-      await service.record({
+      service.record({
         userId,
         action: AuditActionEnum.PLAN_DELETED,
         entity: AuditEntityEnum.PLAN,
         before: { targetMinor: 500_000 },
       });
 
-      expect(repository.append).toHaveBeenCalledWith(userId, expect.objectContaining({ after: null }), undefined);
+      await service.flush();
+
+      expect(repository.appendMany).toHaveBeenCalledWith([expect.objectContaining({ after: null })]);
     });
 
-    it('passes the session through, so the entry commits with the change it describes', async () => {
+    it('stamps the time the change happened, not the time it was written', async () => {
+      service.record({ userId, action: AuditActionEnum.PERIOD_LOCKED, entity: AuditEntityEnum.PERIOD_LOCK });
+
+      await service.flush();
+
+      expect(repository.appendMany).toHaveBeenCalledWith([expect.objectContaining({ at: expect.any(Date) as Date })]);
+    });
+
+    it('never throws at the caller, because the change it describes already committed', async () => {
+      jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      repository.appendMany.mockRejectedValue(new Error('mongo is down'));
+
+      expect(() => {
+        service.record({ userId, action: AuditActionEnum.PLAN_CREATED, entity: AuditEntityEnum.PLAN });
+      }).not.toThrow();
+
+      await expect(service.flush()).resolves.toBeUndefined();
+    });
+
+    it('logs an entry it could not write, so the trail survives in the logs', async () => {
+      const logged = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      repository.appendMany.mockRejectedValue(new Error('mongo is down'));
+
+      service.record({ userId, action: AuditActionEnum.PLAN_CREATED, entity: AuditEntityEnum.PLAN });
+      await service.flush();
+
+      expect(logged).toHaveBeenCalledWith(
+        expect.objectContaining({ entries: expect.any(Array) as unknown[] }),
+        expect.stringContaining('could not be written'),
+      );
+    });
+
+    it('refuses an entry once the buffer is full rather than growing without bound', async () => {
+      const logged = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+
+      for (let index = 0; index <= AUDIT_BUFFER_LIMIT; index += 1) {
+        service.record({ userId, action: AuditActionEnum.PLAN_CREATED, entity: AuditEntityEnum.PLAN });
+      }
+
+      expect(logged).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('buffer is full'));
+
+      await service.flush();
+
+      expect(repository.appendMany.mock.calls.flatMap((call) => call[0])).toHaveLength(AUDIT_BUFFER_LIMIT);
+    });
+  });
+
+  describe('writing inside a transaction', () => {
+    it('uses the session, so a rolled back change leaves no entry claiming it happened', async () => {
       const session = { id: 'session' } as never;
 
-      await service.record({
-        userId,
-        action: AuditActionEnum.PERIOD_LOCKED,
-        entity: AuditEntityEnum.PERIOD_LOCK,
+      await service.recordWithin(
+        { userId, action: AuditActionEnum.IMPORT_COMPLETED, entity: AuditEntityEnum.IMPORT_BATCH },
         session,
-      });
+      );
 
       expect(repository.append).toHaveBeenCalledWith(userId, expect.anything(), session);
     });
 
-    it('stamps the time it happened', async () => {
-      await service.record({ userId, action: AuditActionEnum.PERIOD_LOCKED, entity: AuditEntityEnum.PERIOD_LOCK });
+    it('writes immediately rather than buffering, since the transaction cannot wait', async () => {
+      const session = { id: 'session' } as never;
 
-      expect(repository.append).toHaveBeenCalledWith(
-        userId,
-        expect.objectContaining({ at: expect.any(Date) as Date }),
-        undefined,
+      await service.recordWithin(
+        { userId, action: AuditActionEnum.IMPORT_COMPLETED, entity: AuditEntityEnum.IMPORT_BATCH },
+        session,
       );
+
+      expect(repository.append).toHaveBeenCalledTimes(1);
+      expect(repository.appendMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('shutting down', () => {
+    it('writes anything still buffered, so a normal deploy loses nothing', async () => {
+      service.record({ userId, action: AuditActionEnum.PLAN_CREATED, entity: AuditEntityEnum.PLAN });
+
+      await service.onApplicationShutdown();
+
+      expect(repository.appendMany).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('list', () => {
+    it('flushes first, so a client reading the trail sees the change it just made', async () => {
+      service.record({ userId, action: AuditActionEnum.PLAN_CREATED, entity: AuditEntityEnum.PLAN });
+
+      await service.list(userId, { limit: 50, offset: 0 });
+
+      expect(repository.appendMany).toHaveBeenCalled();
+    });
+
     it('returns the entries in the shared paginated envelope', async () => {
       const result = await service.list(userId, { limit: 50, offset: 0 });
 
@@ -114,9 +207,9 @@ describe('AuditLogService', () => {
     });
 
     it('passes only the filters that were supplied', async () => {
-      await service.list(userId, { limit: 10, offset: 0, entity: AuditEntityEnum.ACTUAL });
+      await service.list(userId, { limit: 10, offset: 0, entity: AuditEntityEnum.EXPENSE });
 
-      expect(repository.list).toHaveBeenCalledWith(userId, { entity: AuditEntityEnum.ACTUAL }, 10, 0);
+      expect(repository.list).toHaveBeenCalledWith(userId, { entity: AuditEntityEnum.EXPENSE }, 10, 0);
     });
 
     it('converts a record filter into an identifier', async () => {

@@ -39,6 +39,14 @@ export class PlansService {
    * so a client can send the same request repeatedly without creating duplicates
    * or having to know whether a target already existed.
    *
+   * @steps
+   * 1. Reject the write when the month is closed.
+   * 2. Confirm the caller may use the category.
+   * 3. Read the current target for the cell, which is what decides whether this
+   *    is recorded as a creation or a change, and supplies the previous amount.
+   * 4. Write the cell.
+   * 5. Audit it, carrying the previous amount only when there was one.
+   *
    * @param userId - The authenticated caller.
    * @param input - The cell and the target.
    * @param requestId - The request making the change.
@@ -56,7 +64,7 @@ export class PlansService {
     const existing = await this.plansRepository.findForCell(userId, categoryId, input.month);
     const plan = await this.plansRepository.upsert(userId, categoryId, input.month, input.targetMinor);
 
-    await this.auditLogService.record({
+    this.auditLogService.record({
       userId,
       action: existing === null ? AuditActionEnum.PLAN_CREATED : AuditActionEnum.PLAN_UPDATED,
       entity: AuditEntityEnum.PLAN,
@@ -71,6 +79,13 @@ export class PlansService {
 
   /**
    * Changes the amount of an existing target.
+   *
+   * @steps
+   * 1. Read the target, so the lock check runs against its stored month rather
+   *    than one the caller could supply.
+   * 2. Reject the change when that month is closed.
+   * 3. Write the new amount.
+   * 4. Audit both amounts.
    *
    * @param userId - The authenticated caller.
    * @param planId - The target to change.
@@ -100,7 +115,7 @@ export class PlansService {
       throw new NotFoundException('Plan not found.');
     }
 
-    await this.auditLogService.record({
+    this.auditLogService.record({
       userId,
       action: AuditActionEnum.PLAN_UPDATED,
       entity: AuditEntityEnum.PLAN,
@@ -121,6 +136,14 @@ export class PlansService {
    * before the deletion can still be explained. The partial unique index means
    * the same cell can be planned again afterwards.
    *
+   * @steps
+   * 1. Read the target, both to confirm it is the caller's and to learn its
+   *    month.
+   * 2. Reject the removal when that month is closed.
+   * 3. Soft delete it.
+   * 4. Audit what it was, since the row itself is no longer readable through the
+   *    normal path.
+   *
    * @param userId - The authenticated caller.
    * @param planId - The target to remove.
    * @param requestId - The request making the change.
@@ -137,7 +160,7 @@ export class PlansService {
     await this.periodLocksService.assertUnlocked(userId, existing.month);
     await this.plansRepository.softDelete(userId, planId);
 
-    await this.auditLogService.record({
+    this.auditLogService.record({
       userId,
       action: AuditActionEnum.PLAN_DELETED,
       entity: AuditEntityEnum.PLAN,
@@ -153,6 +176,13 @@ export class PlansService {
 
   /**
    * Lists targets, newest month first.
+   *
+   * @steps
+   * 1. Turn an optional month range into a single indexed comparison, so an open
+   *    ended range is still one query rather than a special case.
+   * 2. Add the category filter only when supplied, so an absent filter does not
+   *    become a match against undefined.
+   * 3. Read the page and the total for the whole filtered set together.
    *
    * @param userId - The authenticated caller.
    * @param query - Filters and pagination.

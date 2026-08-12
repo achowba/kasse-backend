@@ -24,7 +24,7 @@ The unique index is partial on `deletedAt`, so a deleted name becomes available 
 
 ## Archive and delete are different things
 
-Archiving hides a category from pickers and changes nothing else: existing plans and actuals still resolve it, and reports are unaffected. It is almost always what someone wants.
+Archiving hides a category from pickers and changes nothing else: existing plans and expenses still resolve it, and reports are unaffected. It is almost always what someone wants.
 
 Deleting is a soft delete. The record survives so a locked period keeps resolving the name it referenced and a mistake is recoverable. Both are recorded in the audit log with the state before the change.
 
@@ -34,7 +34,7 @@ The catalogue is seeded at boot when it is missing, so a fresh database is never
 
 ## How it relates to the rest of the project
 
-Plans and actuals reference a category and check the caller may use it. The CSV import resolves a name from a spreadsheet cell through `resolveByName`, which matches on the slug so capitalisation and spacing in the file do not matter. Where an account has its own category with the same name as a shared one, the account's own wins.
+Plans and expenses reference a category and check the caller may use it. The CSV import resolves a name from a spreadsheet cell through `resolveByName`, which matches on the slug so capitalisation and spacing in the file do not matter. Where an account has its own category with the same name as a shared one, the account's own wins.
 
 Every change is recorded through `@modules/audit-log`.
 

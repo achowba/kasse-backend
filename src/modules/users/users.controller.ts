@@ -60,7 +60,7 @@ export class UsersController {
     summary: 'Update account settings',
     description: `Changes the currency or the month the fiscal year starts in. Both are optional; anything omitted is left alone.
 
-Changing the currency relabels amounts rather than converting them. Amounts are stored as minor units with no currency of their own, so existing plans and actuals keep their numeric value.
+Changing the currency relabels amounts rather than converting them. Amounts are stored as minor units with no currency of their own, so existing plans and expenses keep their numeric value.
 
 The email address is not changeable here, because it is the login identity and moving it needs a verification flow.`,
   })

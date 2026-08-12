@@ -24,7 +24,7 @@ Quarters are calendar quarters: Q1 is January through March, whatever a user's f
 
 ## How it relates to the rest of the project
 
-Plans, actuals, and period locks all key on a month. Reports filter by a month range. The CSV import validates the month column against `isValidMonth` before writing anything.
+Plans, expenses, and period locks all key on a month. Reports filter by a month range. The CSV import validates the month column against `isValidMonth` before writing anything.
 
 ## Endpoints
 

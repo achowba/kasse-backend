@@ -17,7 +17,7 @@ type(scope): description
 ```
 
 - `type` is one of `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `perf`, `build`, `ci`.
-- `scope` is required. It is the module or area touched: `plans`, `actuals`, `reports`, `auth`, `categories`, `locks`, `imports`, `audit`, `nl-query`, `platform`, `scaffold`, `docker`, `seed`. For cross-cutting work use `repo`, `deps`, `ci`, `config`, or `docs`.
+- `scope` is required. It is the module or area touched: `plans`, `expenses`, `reports`, `auth`, `categories`, `locks`, `imports`, `audit`, `nl-query`, `platform`, `scaffold`, `docker`, `seed`. For cross-cutting work use `repo`, `deps`, `ci`, `config`, or `docs`.
 - `description` is imperative and lower case, with no trailing full stop. "add the lock gate", not "Added the lock gate."
 - Keep the subject line under 72 characters.
 
