@@ -189,7 +189,15 @@ Both are deterministic. Neither uses unseeded randomness, so test expectations s
 
 ## API documentation
 
-Swagger UI is served at `/docs`, dark themed, with a case insensitive operation filter. The raw document is at `/docs-json`. Neither is mounted in production or test. The committed `openapi.json` is the contract the web client generates its types from, and it is regenerated whenever a DTO changes.
+Swagger UI is served at `/docs`, dark themed, with a case insensitive operation filter. The raw document is at `/docs-json`. Neither is mounted in production or test.
+
+`openapi.json` is committed at the repository root and is the contract the web client generates its types from. It exists alongside `/docs-json` because the two serve different consumers: the live endpoint needs a running server with a database, which another repository's build cannot rely on, and a committed file makes a breaking change visible in a pull request diff. Regenerate it with:
+
+```bash
+npm run openapi:emit
+```
+
+The end to end suite fails when the committed file does not match the application, so CI catches a stale contract rather than a client discovering it. The committed `openapi.json` is the contract the web client generates its types from, and it is regenerated whenever a DTO changes.
 
 All routes are versioned under `/api/v1`. Every list endpoint paginates and returns `{ items, pagination: { limit, offset, total } }`. Every error shares one envelope:
 
