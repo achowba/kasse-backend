@@ -9,6 +9,12 @@ const DEFAULT_PORT = 3000;
 /** Log level used when `LOG_LEVEL` is not set. */
 const DEFAULT_LOG_LEVEL = 'info';
 
+/** Rate limit window in milliseconds when `THROTTLE_TTL_MS` is not set. */
+const DEFAULT_THROTTLE_TTL_MS = 60_000;
+
+/** Requests per window when `THROTTLE_LIMIT` is not set. */
+const DEFAULT_THROTTLE_LIMIT = 120;
+
 /**
  * Splits a comma separated origin list into an allowlist.
  *
@@ -37,4 +43,6 @@ export const appConfig = registerAs('app', (): IAppConfig => ({
   version: API_DOC_VERSION,
   logLevel: process.env['LOG_LEVEL'] ?? DEFAULT_LOG_LEVEL,
   allowedOrigins: parseOrigins(process.env['CORS_ORIGINS']),
+  throttleTtlMs: Number(process.env['THROTTLE_TTL_MS'] ?? DEFAULT_THROTTLE_TTL_MS),
+  throttleLimit: Number(process.env['THROTTLE_LIMIT'] ?? DEFAULT_THROTTLE_LIMIT),
 }));

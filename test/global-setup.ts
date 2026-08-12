@@ -20,6 +20,14 @@ const globalSetup = async (): Promise<void> => {
 
   globalWithMongo.mongoReplicaSet = replicaSet;
   process.env['MONGODB_URI'] = replicaSet.getUri();
+
+  // Rate limiting is framework behaviour that is configured rather than written
+  // here, and a suite exercising the auth routes crosses the credential limit
+  // within seconds. Raising the limits keeps these tests about authentication
+  // instead of about the throttler. Set before any module loads, because the
+  // auth route limit is read when the controller class is defined.
+  process.env['THROTTLE_LIMIT'] = '100000';
+  process.env['AUTH_THROTTLE_LIMIT'] = '100000';
 };
 
 export default globalSetup;

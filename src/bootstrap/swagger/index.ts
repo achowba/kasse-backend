@@ -26,22 +26,21 @@ const SWAGGER_UI_OPTIONS = {
  * Prose shown at the top of the documentation, describing the rules a client
  * cannot infer from the schemas alone.
  */
-const API_DESCRIPTION = [
-  'Monthly spending targets, logged actuals, and variance reporting with locked periods.',
-  '',
-  '**Money** is an integer count of minor units. A field ending in `Minor` holds cents.',
-  '',
-  '**Months** are the string `YYYY-MM`.',
-  '',
-  '**Variance** is `actual - plan`. Variance percent is `null` when the plan is zero, never `NaN`.',
-  '',
-  '**Missing actuals** default to `0`. Pass `missingActuals=null` to receive `null` instead.',
-  'Every report row carries `hasActual`, so a logged zero is never confused with nothing logged.',
-  '',
-  '**Locked periods** reject writes with `423` and the code `PERIOD_LOCKED`.',
-  '',
-  '**Deletes are soft.** A `DELETE` answers `204` and the record stops appearing in reads.',
-].join('\n');
+const API_DESCRIPTION = `Monthly spending targets, logged actuals, and variance reporting with locked periods.
+
+**Money** is an integer count of minor units. A field ending in \`Minor\` holds cents.
+
+**Months** are the string \`YYYY-MM\`.
+
+**Variance** is \`actual - plan\`. Variance percent is \`null\` when the plan is zero, never \`NaN\`.
+
+**Missing actuals** default to \`0\`. Pass \`missingActuals=null\` to receive \`null\` instead. Every report row carries \`hasActual\`, so a logged zero is never confused with nothing logged.
+
+**Locked periods** reject writes with \`423\` and the code \`PERIOD_LOCKED\`.
+
+**Deletes are soft.** A \`DELETE\` answers \`204\` and the record stops appearing in reads.
+
+**Sessions** travel in the \`Authorization\` header, never a cookie, so a mobile or desktop client is a first class caller. Access tokens are RS256 signed and short lived; refresh tokens are opaque, single use, and rotate.`;
 
 /**
  * Mounts the dark themed Swagger UI at `/docs`.

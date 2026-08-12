@@ -1,18 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerGuard, ThrottlerModule, ThrottlerModuleOptions } from '@nestjs/throttler';
 import { LoggerModule, Params } from 'nestjs-pino';
-import { appConfig, databaseConfig, IAppConfig, validateEnvironment } from '@common/config';
+import { appConfig, authConfig, databaseConfig, IAppConfig, validateEnvironment } from '@common/config';
 import { DatabaseModule } from '@common/database';
 import { buildLoggerOptions } from '@common/logging';
+import { AuthModule } from '@modules/auth';
 import { HealthModule } from '@modules/health';
-
-/** Rate limit window, in milliseconds. */
-const THROTTLE_TTL_MS = 60_000;
-
-/** Requests allowed per window, per caller. Auth routes tighten this further. */
-const THROTTLE_LIMIT = 120;
+import { UsersModule } from '@modules/users';
 
 /**
  * Root application module.
@@ -28,7 +24,7 @@ const THROTTLE_LIMIT = 120;
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig],
+      load: [appConfig, authConfig, databaseConfig],
       validate: validateEnvironment,
       cache: true,
     }),
@@ -37,7 +33,16 @@ const THROTTLE_LIMIT = 120;
       inject: [ConfigService],
       useFactory: (configService: ConfigService): Params => buildLoggerOptions(configService.getOrThrow<IAppConfig>('app')),
     }),
-    ThrottlerModule.forRoot([{ ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMIT }]),
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService): ThrottlerModuleOptions => {
+        const { throttleTtlMs, throttleLimit } = configService.getOrThrow<IAppConfig>('app');
+
+        return [{ ttl: throttleTtlMs, limit: throttleLimit }];
+      },
+    }),
+    AuthModule,
+    UsersModule,
     HealthModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

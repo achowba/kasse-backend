@@ -2,7 +2,7 @@ import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { MAX_PAGE_LIMIT } from '@common/constants';
 import { toPaginatedResponse } from './paginated-response';
-import { PaginationQueryDto } from './pagination-query.dto';
+import { PaginationQueryDTO } from './pagination-query.dto';
 
 /**
  * Runs a raw query object through the same conversion and validation the global
@@ -11,14 +11,14 @@ import { PaginationQueryDto } from './pagination-query.dto';
  * @param query - The raw query parameters, as strings, as a URL delivers them.
  * @returns The converted instance and any validation errors.
  */
-const validate = (query: Record<string, unknown>): { dto: PaginationQueryDto; errors: string[] } => {
-  const dto = plainToInstance(PaginationQueryDto, query, { enableImplicitConversion: true });
+const validate = (query: Record<string, unknown>): { dto: PaginationQueryDTO; errors: string[] } => {
+  const dto = plainToInstance(PaginationQueryDTO, query, { enableImplicitConversion: true });
   const errors = validateSync(dto).flatMap((error) => Object.keys(error.constraints ?? {}).map(() => error.property));
 
   return { dto, errors };
 };
 
-describe('PaginationQueryDto', () => {
+describe('PaginationQueryDTO', () => {
   it('defaults to the standard page size at the start of the set', () => {
     const { dto, errors } = validate({});
 
@@ -63,7 +63,7 @@ describe('PaginationQueryDto', () => {
 
 describe('toPaginatedResponse', () => {
   it('reports the total over the whole set, not the page', () => {
-    const query = plainToInstance(PaginationQueryDto, { limit: 2, offset: 4 }, { enableImplicitConversion: true });
+    const query = plainToInstance(PaginationQueryDTO, { limit: 2, offset: 4 }, { enableImplicitConversion: true });
     const response = toPaginatedResponse(['a', 'b'], 97, query);
 
     expect(response.items).toEqual(['a', 'b']);
@@ -71,7 +71,7 @@ describe('toPaginatedResponse', () => {
   });
 
   it('reports an empty page honestly rather than omitting the envelope', () => {
-    const query = plainToInstance(PaginationQueryDto, {}, { enableImplicitConversion: true });
+    const query = plainToInstance(PaginationQueryDTO, {}, { enableImplicitConversion: true });
     const response = toPaginatedResponse([], 0, query);
 
     expect(response.items).toEqual([]);

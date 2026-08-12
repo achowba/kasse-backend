@@ -1,6 +1,16 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min, validateSync } from 'class-validator';
+import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min, MinLength, validateSync } from 'class-validator';
 import { NodeEnvEnum } from '@common/enums';
+
+/** Shortest base64 encoded key the service will start with. Catches an empty or truncated value. */
+const MINIMUM_KEY_LENGTH = 100;
+
+/** Shortest access token lifetime that is workable. Below a minute, clock skew alone causes failures. */
+const MINIMUM_ACCESS_TTL_SECONDS = 60;
+
+/** Markers a decoded key must contain to be the kind of key it claims to be. */
+const PRIVATE_KEY_MARKER = 'PRIVATE KEY';
+const PUBLIC_KEY_MARKER = 'PUBLIC KEY';
 
 /**
  * Shape of the environment this service accepts.
@@ -36,7 +46,66 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   CORS_ORIGINS?: string;
+
+  /*
+   * Required. Base64 encoded PEM keys: the private key signs access tokens and
+   * the public key verifies them. Encoded because a PEM has newlines and an
+   * environment variable is one line.
+   */
+  @IsString()
+  @MinLength(MINIMUM_KEY_LENGTH)
+  JWT_PRIVATE_KEY!: string;
+
+  @IsString()
+  @MinLength(MINIMUM_KEY_LENGTH)
+  JWT_PUBLIC_KEY!: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(MINIMUM_ACCESS_TTL_SECONDS)
+  JWT_ACCESS_TTL_SECONDS?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  JWT_REFRESH_TTL_DAYS?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  THROTTLE_LIMIT?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  THROTTLE_TTL_MS?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  AUTH_THROTTLE_LIMIT?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  AUTH_THROTTLE_TTL_MS?: number;
 }
+
+/**
+ * Fails the boot when an encoded key does not decode to the kind of key it claims to be.
+ *
+ * @param encoded - The base64 encoded value from the environment.
+ * @param marker - The PEM header fragment the decoded value must contain.
+ * @param variableName - The variable being checked, for the error message.
+ * @throws Error When the value does not decode to a matching PEM.
+ */
+const assertKeyContains = (encoded: string, marker: string, variableName: string): void => {
+  const decoded = Buffer.from(encoded, 'base64').toString('utf8');
+
+  if (!decoded.includes(marker)) {
+    throw new Error(`Invalid environment configuration: ${variableName} must be a base64 encoded PEM containing "${marker}".`);
+  }
+};
 
 /**
  * Validates the raw environment and fails the boot when it is malformed.
@@ -63,6 +132,12 @@ export const validateEnvironment = (config: Record<string, unknown>): Environmen
 
     throw new Error(`Invalid environment configuration: ${details}`);
   }
+
+  // Decode and inspect the keys here rather than discovering at the first login
+  // that a variable holds something that is not a key. A base64 blob passes a
+  // string check and still fails to sign.
+  assertKeyContains(validated.JWT_PRIVATE_KEY, PRIVATE_KEY_MARKER, 'JWT_PRIVATE_KEY');
+  assertKeyContains(validated.JWT_PUBLIC_KEY, PUBLIC_KEY_MARKER, 'JWT_PUBLIC_KEY');
 
   return validated;
 };

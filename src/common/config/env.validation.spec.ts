@@ -1,44 +1,95 @@
 import { NodeEnvEnum } from '@common/enums';
 import { validateEnvironment } from './env.validation';
 
+/**
+ * Builds a base64 value that decodes to something PEM shaped.
+ *
+ * @remarks
+ * Validation checks the decoded marker and the encoded length, not that the key
+ * is cryptographically usable, so a real key pair is unnecessary here and would
+ * make the test slow. A signing test would need real keys; this one does not.
+ *
+ * @param marker - The PEM header to embed, such as `PRIVATE KEY`.
+ * @returns The base64 encoded fake key.
+ */
+const fakeKey = (marker: string): string =>
+  Buffer.from(`-----BEGIN ${marker}-----\n${'A'.repeat(200)}\n-----END ${marker}-----`).toString('base64');
+
 /** The minimum environment that boots the service. */
-const VALID_ENV = { MONGODB_URI: 'mongodb://localhost:27017/pva?directConnection=true' };
+const VALID_ENV = {
+  MONGODB_URI: 'mongodb://localhost:27017/pva?directConnection=true',
+  JWT_PRIVATE_KEY: fakeKey('PRIVATE KEY'),
+  JWT_PUBLIC_KEY: fakeKey('PUBLIC KEY'),
+};
 
 describe('validateEnvironment', () => {
-  it('accepts an environment carrying only the database URI', () => {
+  it('accepts an environment carrying only the required variables', () => {
     expect(() => validateEnvironment({ ...VALID_ENV })).not.toThrow();
   });
 
-  it('rejects an environment with no database URI, because the service cannot serve without one', () => {
-    expect(() => validateEnvironment({})).toThrow(/MONGODB_URI/);
+  describe('the database URI', () => {
+    it('is required, because the service cannot serve without a database', () => {
+      const { MONGODB_URI: _omitted, ...withoutUri } = VALID_ENV;
+
+      expect(() => validateEnvironment(withoutUri)).toThrow(/MONGODB_URI/);
+    });
+
+    it('is rejected when empty rather than treated as absent', () => {
+      expect(() => validateEnvironment({ ...VALID_ENV, MONGODB_URI: '' })).toThrow(/MONGODB_URI/);
+    });
   });
 
-  it('rejects an empty database URI rather than treating it as absent', () => {
-    expect(() => validateEnvironment({ MONGODB_URI: '' })).toThrow(/MONGODB_URI/);
+  describe('the signing keys', () => {
+    it('rejects a missing private key', () => {
+      const { JWT_PRIVATE_KEY: _omitted, ...withoutKey } = VALID_ENV;
+
+      expect(() => validateEnvironment(withoutKey)).toThrow(/JWT_PRIVATE_KEY/);
+    });
+
+    it('rejects a missing public key', () => {
+      const { JWT_PUBLIC_KEY: _omitted, ...withoutKey } = VALID_ENV;
+
+      expect(() => validateEnvironment(withoutKey)).toThrow(/JWT_PUBLIC_KEY/);
+    });
+
+    it('rejects a value that is base64 but does not decode to a private key', () => {
+      const notAKey = Buffer.from('x'.repeat(200)).toString('base64');
+
+      expect(() => validateEnvironment({ ...VALID_ENV, JWT_PRIVATE_KEY: notAKey })).toThrow(/JWT_PRIVATE_KEY/);
+    });
+
+    it('rejects a public key pasted into the private key slot', () => {
+      // A real mistake, and one that would otherwise surface as an unhelpful
+      // signing failure at the first login rather than at boot.
+      expect(() => validateEnvironment({ ...VALID_ENV, JWT_PRIVATE_KEY: fakeKey('PUBLIC KEY') })).toThrow(/JWT_PRIVATE_KEY/);
+    });
+
+    it('rejects a truncated key', () => {
+      expect(() => validateEnvironment({ ...VALID_ENV, JWT_PUBLIC_KEY: 'dG9vLXNob3J0' })).toThrow(/JWT_PUBLIC_KEY/);
+    });
   });
 
-  it('converts PORT from the string a process environment always carries', () => {
-    const result = validateEnvironment({ ...VALID_ENV, PORT: '4000' });
+  describe('optional settings', () => {
+    it('converts PORT from the string a process environment always carries', () => {
+      expect(validateEnvironment({ ...VALID_ENV, PORT: '4000' }).PORT).toBe(4000);
+    });
 
-    expect(result.PORT).toBe(4000);
-  });
+    it('accepts a known environment name', () => {
+      expect(validateEnvironment({ ...VALID_ENV, NODE_ENV: 'production' }).NODE_ENV).toBe(NodeEnvEnum.PRODUCTION);
+    });
 
-  it('accepts a known environment name', () => {
-    const result = validateEnvironment({ ...VALID_ENV, NODE_ENV: 'production' });
+    it('rejects an unrecognised environment name', () => {
+      expect(() => validateEnvironment({ ...VALID_ENV, NODE_ENV: 'prod' })).toThrow(/NODE_ENV/);
+    });
 
-    expect(result.NODE_ENV).toBe(NodeEnvEnum.PRODUCTION);
-  });
+    it('rejects a port outside the valid range', () => {
+      expect(() => validateEnvironment({ ...VALID_ENV, PORT: '70000' })).toThrow(/PORT/);
+      expect(() => validateEnvironment({ ...VALID_ENV, PORT: '0' })).toThrow(/PORT/);
+    });
 
-  it('rejects an unrecognised environment name', () => {
-    expect(() => validateEnvironment({ ...VALID_ENV, NODE_ENV: 'prod' })).toThrow(/NODE_ENV/);
-  });
-
-  it('rejects a port above the valid range', () => {
-    expect(() => validateEnvironment({ ...VALID_ENV, PORT: '70000' })).toThrow(/PORT/);
-  });
-
-  it('rejects a port below the valid range', () => {
-    expect(() => validateEnvironment({ ...VALID_ENV, PORT: '0' })).toThrow(/PORT/);
+    it('rejects an access token lifetime short enough that clock skew alone would break it', () => {
+      expect(() => validateEnvironment({ ...VALID_ENV, JWT_ACCESS_TTL_SECONDS: '30' })).toThrow(/JWT_ACCESS_TTL_SECONDS/);
+    });
   });
 
   it('reports every problem at once rather than one per restart', () => {
@@ -51,6 +102,7 @@ describe('validateEnvironment', () => {
     }
 
     expect(message).toContain('MONGODB_URI');
+    expect(message).toContain('JWT_PRIVATE_KEY');
     expect(message).toContain('NODE_ENV');
     expect(message).toContain('PORT');
   });

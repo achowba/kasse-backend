@@ -1,4 +1,4 @@
-import { PaginationQueryDto } from './pagination-query.dto';
+import { PaginationQueryDTO } from './pagination-query.dto';
 
 /**
  * Where a page sits in the whole result set.
@@ -42,7 +42,7 @@ export interface IPaginatedResponse<TItem> {
 export const toPaginatedResponse = <TItem>(
   items: TItem[],
   total: number,
-  query: PaginationQueryDto,
+  query: PaginationQueryDTO,
 ): IPaginatedResponse<TItem> => ({
   items,
   pagination: { limit: query.limit, offset: query.offset, total },

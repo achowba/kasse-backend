@@ -26,6 +26,23 @@
 
 A record the caller does not own returns `404`, not `403`. Confirming that another user's record exists is a leak.
 
+## Documentation
+
+Every controller and every route is documented well enough that a reader never needs the source. The generated `openapi.json` is the contract the web client builds from, so an undocumented field effectively does not exist.
+
+On the controller:
+
+- `@ApiTags` groups the routes.
+- `@ApiBearerAuth` on anything that requires a session.
+
+On every route:
+
+- `@ApiOperation` with a `summary` and a `description`. The summary is a short phrase; the description says what the route does, what it validates, and any rule a caller could not infer from the schema, such as which errors are possible and why.
+- `@ApiResponse` for every status the route can actually return, each with the DTO it returns. Include the failures: `401`, `404`, `409`, `423`, not only the happy path.
+- `@ApiParam` and `@ApiQuery` where a parameter needs more than its name.
+
+A response class carries `@ApiProperty` on every field, with a description and an example. An enum field declares its `enum` so the values appear in the document.
+
 ## DTOs
 
 - A request is a DTO class with `class-validator` decorators. The global pipe whitelists, strips unknown properties, and rejects a request that carries them.
