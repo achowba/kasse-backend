@@ -6,7 +6,7 @@
  * and so re-running a seeder finds the same account rather than accumulating one
  * per run.
  */
-export const SEED_EMAIL = 'demo@plan-vs-spend.app';
+export const SEED_EMAIL = 'demo@kasse.app';
 
 /**
  * The seed account's password.
