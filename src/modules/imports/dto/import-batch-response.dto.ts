@@ -71,7 +71,9 @@ export class ImportBatchResponseDTO {
       rowCount: batch.rowCount,
       errorCount: batch.errorCount,
       expenseCount: batch.expenseCount,
-      errors: batch.errors.map((error: IImportRowError) => ({ ...error })),
+      // `rowErrors` on the document, `errors` on the wire. The rename exists to
+      // avoid a reserved Mongoose property, not to change the API.
+      errors: batch.rowErrors.map((error: IImportRowError) => ({ ...error })),
       createdAt: batch.createdAt.toISOString(),
     };
   }

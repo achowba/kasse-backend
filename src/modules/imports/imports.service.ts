@@ -267,7 +267,7 @@ export class ImportsService {
       status: ImportStatusEnum.FAILED,
       rowCount,
       errorCount: errors.length,
-      errors: errors.slice(0, MAX_REPORTED_ERRORS),
+      rowErrors: errors.slice(0, MAX_REPORTED_ERRORS),
       expenseCount: 0,
     });
 
@@ -314,7 +314,7 @@ export class ImportsService {
             status: ImportStatusEnum.COMPLETED,
             rowCount,
             errorCount: 0,
-            errors: [],
+            rowErrors: [],
             expenseCount: rows.length,
           },
           session,

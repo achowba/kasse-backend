@@ -57,6 +57,9 @@ import { TokenService } from './token.service';
     JwtStrategy,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
   ],
-  exports: [TokenService],
+  // AuthService is exported for the seeders, which create the demo account
+  // through the same signup path a person uses rather than writing a user row
+  // directly. Nothing in the HTTP graph imports it.
+  exports: [TokenService, AuthService],
 })
 export class AuthModule {}
