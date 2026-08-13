@@ -15,7 +15,7 @@ import { Types } from 'mongoose';
 import { CurrentUser, type IAuthenticatedUser } from '@common/auth';
 import { ApiVersionEnum } from '@common/enums';
 import { ErrorResponseDTO } from '@common/errors';
-import { IPaginatedResponse } from '@common/pagination';
+import { ApiPaginatedResponse, IPaginatedResponse } from '@common/pagination';
 import { ParseObjectIdPipe } from '@common/pipes';
 import { RequestId } from '@common/request-context';
 import { CategoriesService } from './categories.service';
@@ -54,7 +54,7 @@ Each entry reports whether it is \`shared\`. A shared category can be selected b
 
 Archived categories are excluded by default, because a picker wants only what can be chosen now. Pass \`includeArchived=true\` to see them; they still resolve in existing plans, expenses, and reports.`,
   })
-  @ApiOkResponse({ description: 'A page of selectable categories.', type: [CategoryResponseDTO] })
+  @ApiPaginatedResponse(CategoryResponseDTO, 'A page of selectable categories.')
   async list(
     @CurrentUser() user: IAuthenticatedUser,
     @Query() query: ListCategoriesQueryDTO,

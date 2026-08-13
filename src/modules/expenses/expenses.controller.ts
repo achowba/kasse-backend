@@ -15,7 +15,7 @@ import { Types } from 'mongoose';
 import { CurrentUser, type IAuthenticatedUser } from '@common/auth';
 import { ApiVersionEnum } from '@common/enums';
 import { ErrorResponseDTO } from '@common/errors';
-import { IPaginatedResponse } from '@common/pagination';
+import { ApiPaginatedResponse, IPaginatedResponse } from '@common/pagination';
 import { ParseObjectIdPipe } from '@common/pipes';
 import { RequestId } from '@common/request-context';
 import { CreateExpenseDTO } from './dto/create-expense.dto';
@@ -51,7 +51,7 @@ This is also the report's drill down. A report cell is one category in one month
 
 Filtering by \`importBatchId\` answers the question a reviewer actually asks after an import, which is what that file put in.`,
   })
-  @ApiOkResponse({ description: 'A page of expenses.', type: [ExpenseResponseDTO] })
+  @ApiPaginatedResponse(ExpenseResponseDTO, 'A page of expenses.')
   async list(
     @CurrentUser() user: IAuthenticatedUser,
     @Query() query: ListExpensesQueryDTO,

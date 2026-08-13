@@ -32,7 +32,7 @@ import { Types } from 'mongoose';
 import { CurrentUser, type IAuthenticatedUser } from '@common/auth';
 import { ApiVersionEnum } from '@common/enums';
 import { ErrorResponseDTO } from '@common/errors';
-import { IPaginatedResponse, PaginationQueryDTO } from '@common/pagination';
+import { ApiPaginatedResponse, IPaginatedResponse, PaginationQueryDTO } from '@common/pagination';
 import { ParseObjectIdPipe } from '@common/pipes';
 import { RequestId } from '@common/request-context';
 import { EXPENSIVE_THROTTLE_TTL_MS, IMPORT_THROTTLE_LIMIT } from '@common/throttling';
@@ -145,7 +145,7 @@ Payroll,2026-01,20500.00
 
 A failed import is kept deliberately. Without the record, a user whose upload was rejected has only the HTTP response, which they have already closed by the time they ask what went wrong.`,
   })
-  @ApiOkResponse({ description: 'A page of imports.', type: [ImportBatchResponseDTO] })
+  @ApiPaginatedResponse(ImportBatchResponseDTO, 'A page of imports.')
   async list(
     @CurrentUser() user: IAuthenticatedUser,
     @Query() query: PaginationQueryDTO,

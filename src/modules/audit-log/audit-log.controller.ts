@@ -1,9 +1,9 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { CurrentUser, type IAuthenticatedUser } from '@common/auth';
 import { ApiVersionEnum } from '@common/enums';
 import { ErrorResponseDTO } from '@common/errors';
-import { IPaginatedResponse } from '@common/pagination';
+import { ApiPaginatedResponse, IPaginatedResponse } from '@common/pagination';
 import { AuditLogService } from './audit-log.service';
 import { AuditEntryResponseDTO } from './dto/audit-entry-response.dto';
 import { ListAuditEntriesQueryDTO } from './dto/list-audit-entries.query.dto';
@@ -42,7 +42,7 @@ Filter by \`entity\` and \`entityId\` to read the history of one record.
 
 The trail is append only. No route in this API can edit or remove an entry.`,
   })
-  @ApiOkResponse({ description: 'A page of the audit trail.', type: [AuditEntryResponseDTO] })
+  @ApiPaginatedResponse(AuditEntryResponseDTO, 'A page of the trail, newest first.')
   async list(
     @CurrentUser() user: IAuthenticatedUser,
     @Query() query: ListAuditEntriesQueryDTO,
