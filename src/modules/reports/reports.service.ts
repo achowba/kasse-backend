@@ -104,10 +104,11 @@ export class ReportsService {
       categoryIds,
       query.limit,
       query.offset,
+      policy,
     );
 
     const response: ReportResponseDTO = {
-      items: cells.map((cell: IReportCell) => this.toRow(cell, policy)),
+      items: cells.map((cell: IReportCell) => this.toRow(cell)),
       totals: this.toTotals(totals),
       pagination: { limit: query.limit, offset: query.offset, total },
     };
@@ -181,29 +182,26 @@ export class ReportsService {
   }
 
   /**
-   * Turns one summed cell into a variance row.
+   * Shapes a computed cell for the wire.
    *
    * @remarks
-   * `hasActual` comes from the aggregation rather than from the amount, which is
-   * the distinction the whole policy rests on. A category with an expense of 0
-   * logged against it has an actual; one with no expenses at all does not, and
-   * both sum to 0. Deciding from the sum would report them identically.
+   * The arithmetic already happened in the aggregation, so this only renames and
+   * stringifies. `calculateVariance` in `@common/money` remains the definition of
+   * what those numbers mean, and a parity test asserts the pipeline agrees with
+   * it across the edge cases; this is the fast path, not a second opinion.
    *
-   * @param cell - The summed cell.
-   * @param policy - How to treat a cell with a plan but nothing logged.
+   * @param cell - The computed cell.
    * @returns The row as a client sees it.
    */
-  private toRow(cell: IReportCell, policy: MissingActualPolicyEnum): ReportRowDTO {
-    const variance = calculateVariance(cell.planMinor, cell.hasActual ? cell.actualMinor : null, policy);
-
+  private toRow(cell: IReportCell): ReportRowDTO {
     return {
       categoryId: cell.categoryId.toString(),
       categoryName: cell.categoryName,
       month: cell.month,
-      planMinor: variance.planMinor,
-      actualMinor: variance.actualMinor,
-      varianceMinor: variance.varianceMinor,
-      variancePercent: variance.variancePercent,
+      planMinor: cell.planMinor,
+      actualMinor: cell.actualMinor,
+      varianceMinor: cell.varianceMinor,
+      variancePercent: cell.variancePercent,
       hasPlan: cell.hasPlan,
       hasActual: cell.hasActual,
     };

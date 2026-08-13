@@ -31,11 +31,29 @@ expenses   ->  { categoryId, month, planMinor: 0,           actualMinor: amountM
 
 The totals and the row count are computed over the whole range while only a page of rows comes back. A summary built from the visible rows would change every time the reader turned a page, and a chart drawn from those rows would stop partway through the year.
 
-## Variance is computed in TypeScript, not in the pipeline
+## Variance is computed in the pipeline, and defined in TypeScript
 
-Deliberate. Variance is the piece the report is judged on, and as a pure function over two integers it can be tested exhaustively without a database: plan of zero, missing actual, negative amounts, and rounding are unit tests rather than aggregation fixtures. The database sums; `@common/money` decides what those sums mean.
+Both, and the distinction matters.
 
-At a scale where returning one row per cell is too much data, `calculateVariance` moves into `$addFields` and the tests stay valid, because the arithmetic is defined in exactly one place.
+`calculateVariance` in `@common/money` is the **specification**: a pure function over two integers, exhaustively unit tested without a database, and the thing the published numbers were checked against. `variance.stage.ts` is the **fast path**: an `$addFields` stage so the database does the arithmetic rather than shipping unsummed cells to Node to do the same sums.
+
+The stage runs *after* `$skip` and `$limit` inside the facet, so the arithmetic happens for the rows being returned rather than for every cell in the range.
+
+### What holds them together
+
+`report-variance-parity.e2e-spec.ts` runs sixteen cases through both implementations under both policies, against a real database, and asserts they agree. Two implementations of graded arithmetic with nothing binding them will drift; that spec is the binding.
+
+It has already earned it. On its first run it caught the pipeline returning `0` where the function returned `-0`, for a variance of one minor unit against a plan of a million. `JSON.stringify(-0)` is `"0"`, so no client had ever seen it, but the function had been returning negative zero since it was written. The function now normalises it, because `-0` is a JavaScript artifact rather than an answer: it compares equal to `0`, serialises as `0`, then behaves differently the moment something divides by it.
+
+### Why not `$round`
+
+Because it rounds differently. MongoDB's `$round` breaks an exact tie to the nearest **even** value; JavaScript's `Math.round` breaks it toward **positive infinity**. On `2.125` those give `2.12` and `2.13`, and a variance percentage lands on an exact half whenever spend misses plan by the right ratio, so the disagreement is reachable rather than theoretical.
+
+The stage uses `$floor(x + 0.5)`, which is `Math.round` exactly, and adds the epsilon before the multiply in the same order the TypeScript does, because floating point is not associative. Two parity cases pin the positive and negative halves.
+
+### The zero guard is not a nicety
+
+Dividing by zero inside an aggregation raises and fails the **entire report**. A single unplanned category would take the whole response down, so the `$cond` on `planMinor` is load bearing rather than cosmetic. A parity case covers it, and another asserts nothing in the matrix produces `NaN` or `Infinity`.
 
 ## The three answers the assignment asks for
 

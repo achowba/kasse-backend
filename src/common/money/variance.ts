@@ -37,13 +37,28 @@ export interface IVarianceResult {
 /**
  * Rounds to two decimal places.
  *
+ * @remarks
+ * Half **up**, not half away from zero: `Math.round` breaks a tie toward positive
+ * infinity, so `-2.125` becomes `-2.12` rather than `-2.13`. The distinction only
+ * shows up on a negative exact half, which a variance percentage reaches whenever
+ * spend is under plan by the right ratio, so it is worth stating precisely. The
+ * report aggregation reproduces this rule rather than using `$round`, whose
+ * MongoDB semantics differ, and a parity test holds the two together.
+ *
  * @param value - The value to round.
- * @returns The value, rounded half away from zero at two decimal places.
+ * @returns The value, rounded half up at two decimal places.
  */
 const roundPercent = (value: number): number => {
   const factor = 10 ** PERCENT_DECIMAL_PLACES;
+  const rounded = Math.round((value + Number.EPSILON) * factor) / factor;
 
-  return Math.round((value + Number.EPSILON) * factor) / factor;
+  // Normalises negative zero. Spending one unit under a large plan rounds to
+  // `-0`, which is a JavaScript artifact rather than an answer: it compares equal
+  // to `0`, serialises as `0`, and then behaves differently the moment anything
+  // divides by it. Returning it would also mean the report and the aggregation
+  // disagreed on a value neither of them meant, which is how the parity test
+  // found this.
+  return rounded === 0 ? 0 : rounded;
 };
 
 /**

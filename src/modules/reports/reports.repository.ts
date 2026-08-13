@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, PipelineStage, Types } from 'mongoose';
+import { MissingActualPolicyEnum } from '@common/money';
 import { Plan } from '@modules/plans';
 import { CATEGORIES_COLLECTION, EXPENSES_COLLECTION } from './reports.constants';
 import { SeriesGroupByEnum } from './reports.enums';
+import { varianceStage } from './variance.stage';
 
 /**
  * One category and month, with both sides summed.
@@ -12,7 +14,9 @@ import { SeriesGroupByEnum } from './reports.enums';
  * @property categoryName - Its name, resolved in the aggregation.
  * @property month - The month, as `YYYY-MM`.
  * @property planMinor - The target, or 0 when nothing was planned.
- * @property actualMinor - Logged spend, or 0 when nothing was logged.
+ * @property actualMinor - Logged spend. Null under the `null` policy when nothing was logged.
+ * @property varianceMinor - Actual minus plan, computed in the pipeline. Null when the actual is null.
+ * @property variancePercent - The variance over the plan, to two decimal places. Null when the plan is 0.
  * @property hasPlan - Whether a target exists, so a target of 0 is distinguishable from no target.
  * @property hasActual - Whether anything was logged, so logged 0 is distinguishable from nothing logged.
  */
@@ -21,7 +25,9 @@ export interface IReportCell {
   categoryName: string;
   month: string;
   planMinor: number;
-  actualMinor: number;
+  actualMinor: number | null;
+  varianceMinor: number | null;
+  variancePercent: number | null;
   hasPlan: boolean;
   hasActual: boolean;
 }
@@ -88,7 +94,8 @@ export class ReportsRepository {
    *    over booleans, which reports true when either side contributed.
    * 4. Resolve category names, projecting only the name so the join does not drag
    *    whole documents through.
-   * 5. Split into rows, totals, and count.
+   * 5. Split into rows, totals, and count, computing variance on the page of rows
+   *    once it has been cut.
    *
    * @param userId - The authenticated caller.
    * @param from - First month of the range, inclusive.
@@ -96,7 +103,8 @@ export class ReportsRepository {
    * @param categoryIds - Restrict to these categories, or every category when empty.
    * @param limit - How many rows to return.
    * @param offset - How many rows to skip.
-   * @returns The page of cells, the totals across the range, and the total row count.
+   * @param policy - How to treat a cell with a plan but nothing logged.
+   * @returns The page of cells with variance computed, the totals across the range, and the row count.
    */
   async aggregate(
     userId: Types.ObjectId,
@@ -105,6 +113,7 @@ export class ReportsRepository {
     categoryIds: Types.ObjectId[],
     limit: number,
     offset: number,
+    policy: MissingActualPolicyEnum,
   ): Promise<{ cells: IReportCell[]; totals: IReportTotals; total: number }> {
     const pipeline: PipelineStage[] = [
       ...this.unionedSides(userId, from, to, categoryIds),
@@ -118,6 +127,9 @@ export class ReportsRepository {
             { $sort: { month: 1, categoryName: 1 } },
             { $skip: offset },
             { $limit: limit },
+            // After the page is cut, so the arithmetic runs for the rows being
+            // returned rather than for every cell in the range.
+            varianceStage(policy),
           ],
           totals: [
             {
