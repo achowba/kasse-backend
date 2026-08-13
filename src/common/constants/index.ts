@@ -25,3 +25,12 @@ export const DEFAULT_PAGE_LIMIT = 50;
  * Hard cap on a page size, so a client cannot request an unbounded read.
  */
 export const MAX_PAGE_LIMIT = 200;
+
+/**
+ * The context on the startup line.
+ *
+ * @remarks
+ * Named rather than inlined so the line a developer greps for on every restart
+ * has one spelling.
+ */
+export const BOOTSTRAP_CONTEXT = 'Bootstrap';

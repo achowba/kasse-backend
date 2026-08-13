@@ -33,13 +33,13 @@ COPY package.json ./
 # create. Nothing at runtime writes to the filesystem.
 USER node
 
-EXPOSE 3000
+EXPOSE 1413
 
 # Liveness, not readiness. This endpoint checks nothing external on purpose: if
 # it pinged the database, a database blip would mark every healthy instance
 # unhealthy and turn a degradation into an outage. Readiness lives at
 # /api/v1/health/ready and is for the load balancer, not for the restart policy.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||1413)+'/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "dist/main"]

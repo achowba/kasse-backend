@@ -1,5 +1,5 @@
 /** Port used when `PORT` is not set. */
-export const DEFAULT_PORT = 3000;
+export const DEFAULT_PORT = 1413;
 
 /** Log level used when `LOG_LEVEL` is not set. */
 export const DEFAULT_LOG_LEVEL = 'info';

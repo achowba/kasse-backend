@@ -89,10 +89,24 @@ export const REDACTION_MAX_DEPTH = 6;
 export const RESERVED_ENTRY_KEYS: ReadonlySet<string> = new Set(['level', 'time', 'msg', 'pid', 'hostname']);
 
 /**
+ * The context stamped on every request line.
+ *
+ * @remarks
+ * The framework's own lines carry a context and the request lines did not, so a
+ * reader filtering the log by context lost exactly the lines they were looking
+ * for. One value, used everywhere, so that filter works.
+ */
+export const REQUEST_LOG_CONTEXT = 'APIRequest';
+
+/**
  * Paths that are too noisy to log on every hit.
  *
  * @remarks
- * A probe every few seconds would otherwise dominate the logs and make the
- * requests that matter harder to find.
+ * Only the health probes. A container platform hits these every few seconds, and
+ * they would otherwise bury the requests that mean something.
+ *
+ * The documentation UI is deliberately **not** here. It was, and that was wrong:
+ * a probe is a machine checking a pulse, while `/docs` is a person opening a
+ * page, which is exactly the kind of thing a log should show.
  */
-export const UNLOGGED_PATHS = ['/api/v1/health', '/api/v1/health/ready', '/docs', '/docs-json'];
+export const UNLOGGED_PATHS = ['/api/v1/health', '/api/v1/health/ready'];

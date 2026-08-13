@@ -1,10 +1,12 @@
 import { ForbiddenException, INestApplication, Logger, ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
+import pinoHttp, { Options } from 'pino-http';
 import { IAppConfig } from '@common/config';
 import { API_PREFIX } from '@common/constants';
 import { ApiVersionEnum, NodeEnvEnum } from '@common/enums';
 import { AllExceptionsFilter } from '@common/errors';
+import { buildLoggerOptions } from '@common/logging';
 import { setupSwagger } from '../swagger';
 
 /**
@@ -35,6 +37,21 @@ export const bootstrapNestServer = (app: INestApplication): INestApplication => 
   const appConfig = app.get(ConfigService).getOrThrow<IAppConfig>('app');
   const isDevelopmentOrTest = [NodeEnvEnum.DEVELOPMENT, NodeEnvEnum.TEST].includes(appConfig.nodeEnv);
   const isDocsEnabled = ![NodeEnvEnum.PRODUCTION, NodeEnvEnum.TEST].includes(appConfig.nodeEnv);
+
+  // Before everything, so a request is logged and carries an id no matter what
+  // happens to it afterwards.
+  //
+  // `LoggerModule` already registers this middleware, but Nest applies the global
+  // prefix to a middleware path, so that registration only ever covered `/api`.
+  // A request to `/`, `/favicon.ico`, `/docs`, or any typo reached the exception
+  // filter with no request line and an empty request id: invisible in the log and
+  // impossible to correlate with the error it produced. Registering at the
+  // Express level runs before routing and is not prefixed.
+  //
+  // pino-http is idempotent per request. It marks a request it has already
+  // handled and returns early, so the module's registration inside `/api` does
+  // not produce a second line.
+  app.use(pinoHttp(buildLoggerOptions(appConfig).pinoHttp as Options));
 
   app.use(
     helmet({

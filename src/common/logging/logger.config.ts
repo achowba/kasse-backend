@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { hostname } from 'node:os';
 import { RequestMethod } from '@nestjs/common';
 import { Params } from 'nestjs-pino';
 import type { Level } from 'pino';
 import { IAppConfig } from '@common/config';
 import { NodeEnvEnum } from '@common/enums';
 import { redactEntry } from './logger.format';
-import { REDACTED_PATHS, REDACTED_PLACEHOLDER, UNLOGGED_PATHS } from './logging.constants';
+import { REDACTED_PATHS, REDACTED_PLACEHOLDER, REQUEST_LOG_CONTEXT, UNLOGGED_PATHS } from './logging.constants';
 
 /**
  * Reports whether the pretty printing transport is installed.
@@ -55,10 +56,26 @@ export const buildLoggerOptions = (appConfig: IAppConfig): Params => ({
   // It must be `*splat`. The `{*path}` form that Nest names in its own warning
   // message matches nothing here, and fails silently: the middleware stops
   // running, so requests are no longer logged and no error is raised.
+  //
+  // Nest applies the global prefix to a middleware path, so this covers `/api`
+  // and nothing else. Everything outside it, `/`, `/favicon.ico`, `/docs`, and
+  // any typo a client sends, was reaching the exception filter with no request
+  // log and an empty request id, which made a 404 both invisible and
+  // unattributable. `bootstrapNestServer` registers the same middleware at the
+  // Express level, before routing, so those requests are logged too.
   forRoutes: [{ path: '*splat', method: RequestMethod.ALL }],
 
   pinoHttp: {
     level: appConfig.logLevel,
+
+    // On every line, including the framework's own, because the first question
+    // asked of a pasted log line is which environment produced it. Setting `base`
+    // rather than adding it per call site means nothing can forget it.
+    //
+    // `pid` and `hostname` are restated because `base` replaces pino's defaults
+    // rather than extending them, and dropping them would lose the two fields
+    // that identify which process wrote a line when several are running.
+    base: { pid: process.pid, hostname: hostname(), environment: appConfig.nodeEnv },
 
     genReqId: (req: IncomingMessage, res: ServerResponse): string => {
       const forwarded = req.headers['x-request-id'];
@@ -79,8 +96,21 @@ export const buildLoggerOptions = (appConfig: IAppConfig): Params => ({
       log: redactEntry,
     },
 
+    // Stamped on every request line so it reads like the rest of the log. Without
+    // it the framework's own lines carry a context and the request lines do not,
+    // and a reader filtering by context silently loses the requests.
+    customProps: (): Record<string, string> => ({ context: REQUEST_LOG_CONTEXT }),
+
+    customSuccessMessage: (req: IncomingMessage, res: ServerResponse): string =>
+      `${req.method ?? 'GET'} ${req.url ?? ''} ${res.statusCode}`,
+
+    customErrorMessage: (req: IncomingMessage, res: ServerResponse): string =>
+      `${req.method ?? 'GET'} ${req.url ?? ''} ${res.statusCode}`,
+
     autoLogging: {
-      ignore: (req: IncomingMessage): boolean => UNLOGGED_PATHS.includes(req.url ?? ''),
+      // Matched on the path alone, so a query string does not smuggle a health
+      // probe back into the log.
+      ignore: (req: IncomingMessage): boolean => UNLOGGED_PATHS.includes((req.url ?? '').split('?')[0] ?? ''),
     },
 
     customLogLevel: (_req: IncomingMessage, res: ServerResponse, error?: Error): Level => {
