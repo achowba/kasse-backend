@@ -48,9 +48,12 @@ export const bootstrapNestServer = (app: INestApplication): INestApplication => 
   // impossible to correlate with the error it produced. Registering at the
   // Express level runs before routing and is not prefixed.
   //
-  // pino-http is idempotent per request. It marks a request it has already
-  // handled and returns early, so the module's registration inside `/api` does
-  // not produce a second line.
+  // This is the only pino-http in the process, and it has to stay that way.
+  // `LoggerModule` is configured with `useExisting`, so it binds the request
+  // logger into async local storage and does not construct an instance of its
+  // own. pino-http carries no marker for a request it has already handled, so a
+  // second instance logs every `/api` request a second time, distinguishable
+  // only by the `params` that routing has since attached.
   app.use(pinoHttp(buildLoggerOptions(appConfig).pinoHttp as Options));
 
   app.use(

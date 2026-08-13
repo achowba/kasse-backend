@@ -1,8 +1,16 @@
-import { ConflictException, Injectable, Logger, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnApplicationBootstrap,
+} from '@nestjs/common';
 import { Types } from 'mongoose';
 import { DUPLICATE_KEY_ERROR } from '@common/database';
 import { IPaginatedResponse, toPaginatedResponse } from '@common/pagination';
 import { AuditActionEnum, AuditEntityEnum, AuditLogService } from '@modules/audit-log';
+import { CATEGORY_NAME_TAKEN, SHARED_CATEGORY_IS_READ_ONLY } from './categories.constants';
 import { CategoriesRepository } from './categories.repository';
 import { toCategorySlug } from './categories.util';
 import { CATEGORY_CATALOGUE } from './category-catalogue';
@@ -124,7 +132,7 @@ export class CategoriesService implements OnApplicationBootstrap {
    * @param input - The name to create.
    * @param requestId - The request making the change.
    * @returns The created category.
-   * @throws ConflictException When the caller already has a category with that name.
+   * @throws ConflictException When the name is already taken, by the caller or the catalogue.
    */
   async create(userId: Types.ObjectId, input: CreateCategoryDTO, requestId?: string): Promise<CategoryDocument> {
     const slug = toCategorySlug(input.name);
@@ -133,8 +141,8 @@ export class CategoriesService implements OnApplicationBootstrap {
       throw new ConflictException('A category name must contain at least one letter or number.');
     }
 
-    if (await this.categoriesRepository.ownsSlug(userId, slug)) {
-      throw new ConflictException('You already have a category with that name.');
+    if (await this.categoriesRepository.slugIsVisible(userId, slug)) {
+      throw new ConflictException(CATEGORY_NAME_TAKEN);
     }
 
     const category = await this.categoriesRepository.create(userId, input.name.trim(), slug);
@@ -155,16 +163,18 @@ export class CategoriesService implements OnApplicationBootstrap {
    * Renames or archives a category the caller owns.
    *
    * @remarks
-   * Shared catalogue entries are not editable, and are not found here at all,
-   * so an attempt to rename one answers 404 rather than explaining the rule.
+   * Only the caller's own categories are editable. A shared catalogue entry is
+   * refused with 403 and told why, because it is listed to them and "not found"
+   * would contradict the response they just read. See {@link resolveOwned}.
    *
    * @param userId - The authenticated caller.
    * @param id - The category identifier.
    * @param changes - The fields to change.
    * @param requestId - The request making the change.
    * @returns The updated category.
-   * @throws NotFoundException When the caller does not own a category with that id.
-   * @throws ConflictException When the new name collides with another of their categories.
+   * @throws ForbiddenException When the id is a shared catalogue entry.
+   * @throws NotFoundException When the id is not theirs, or does not exist.
+   * @throws ConflictException When the new name is already taken.
    */
   async update(
     userId: Types.ObjectId,
@@ -172,19 +182,14 @@ export class CategoriesService implements OnApplicationBootstrap {
     changes: UpdateCategoryDTO,
     requestId?: string,
   ): Promise<CategoryDocument> {
-    const existing = await this.categoriesRepository.findOwnedById(userId, id);
-
-    if (existing === null) {
-      throw new NotFoundException('Category not found.');
-    }
-
+    const existing = await this.resolveOwned(userId, id);
     const update: Partial<{ name: string; slug: string; archivedAt: Date | null }> = {};
 
     if (changes.name !== undefined) {
       const slug = toCategorySlug(changes.name);
 
-      if (slug !== existing.slug && (await this.categoriesRepository.ownsSlug(userId, slug))) {
-        throw new ConflictException('You already have a category with that name.');
+      if (slug !== existing.slug && (await this.categoriesRepository.slugIsVisible(userId, slug))) {
+        throw new ConflictException(CATEGORY_NAME_TAKEN);
       }
 
       update.name = changes.name.trim();
@@ -226,14 +231,11 @@ export class CategoriesService implements OnApplicationBootstrap {
    * @param userId - The authenticated caller.
    * @param id - The category identifier.
    * @param requestId - The request making the change.
-   * @throws NotFoundException When the caller does not own a category with that id.
+   * @throws ForbiddenException When the id is a shared catalogue entry.
+   * @throws NotFoundException When the id is not theirs, or does not exist.
    */
   async remove(userId: Types.ObjectId, id: Types.ObjectId, requestId?: string): Promise<void> {
-    const existing = await this.categoriesRepository.findOwnedById(userId, id);
-
-    if (existing === null) {
-      throw new NotFoundException('Category not found.');
-    }
+    const existing = await this.resolveOwned(userId, id);
 
     await this.categoriesRepository.softDelete(userId, id);
 
@@ -245,6 +247,45 @@ export class CategoriesService implements OnApplicationBootstrap {
       before: { name: existing.name, archived: existing.archivedAt !== null },
       requestId,
     });
+  }
+
+  /**
+   * Resolves a category the caller is allowed to change.
+   *
+   * @remarks
+   * One gate for every mutating path, so no route can answer the question
+   * differently from another.
+   *
+   * The two rejections are deliberately different, and the difference is the
+   * point. A shared catalogue entry is listed to the caller, so answering "not
+   * found" when they try to rename it contradicts the response they just read,
+   * and leaves a client unable to tell a category it may not edit from one that
+   * does not exist. It is refused with 403 and told why.
+   *
+   * An id belonging to another account is a different matter. Confirming it
+   * exists would leak that another tenant holds it, so that stays 404, which is
+   * the same answer as an id that never existed.
+   *
+   * @param userId - The authenticated caller.
+   * @param id - The category identifier.
+   * @returns The caller's own category.
+   * @throws ForbiddenException When it is a shared catalogue entry.
+   * @throws NotFoundException When it is not theirs, or does not exist.
+   */
+  private async resolveOwned(userId: Types.ObjectId, id: Types.ObjectId): Promise<CategoryDocument> {
+    const owned = await this.categoriesRepository.findOwnedById(userId, id);
+
+    if (owned !== null) {
+      return owned;
+    }
+
+    // Only reached on the failure path, so the ordinary case still costs one
+    // query.
+    if ((await this.categoriesRepository.findVisibleById(userId, id)) !== null) {
+      throw new ForbiddenException(SHARED_CATEGORY_IS_READ_ONLY);
+    }
+
+    throw new NotFoundException('Category not found.');
   }
 
   /**

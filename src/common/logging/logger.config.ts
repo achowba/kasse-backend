@@ -6,8 +6,8 @@ import { Params } from 'nestjs-pino';
 import type { Level } from 'pino';
 import { IAppConfig } from '@common/config';
 import { NodeEnvEnum } from '@common/enums';
-import { redactEntry } from './logger.format';
-import { REDACTED_PATHS, REDACTED_PLACEHOLDER, REQUEST_LOG_CONTEXT, UNLOGGED_PATHS } from './logging.constants';
+import { buildRequestProps, redactEntry } from './logger.format';
+import { REDACTED_PATHS, REDACTED_PLACEHOLDER, UNLOGGED_PATHS } from './logging.constants';
 
 /**
  * Reports whether the pretty printing transport is installed.
@@ -49,20 +49,30 @@ const isPrettyPrintAvailable = (): boolean => {
  * @returns Options for `LoggerModule.forRootAsync`.
  */
 export const buildLoggerOptions = (appConfig: IAppConfig): Params => ({
+  // `bootstrapNestServer` registers pino-http at the Express level, because Nest
+  // applies the global prefix to a middleware path: this module's registration
+  // only ever covered `/api`, so `/`, `/favicon.ico`, `/docs`, and any typo a
+  // client sends reached the exception filter with no request log and an empty
+  // request id, which made a 404 both invisible and unattributable.
+  //
+  // `useExisting` stops this module building a second pino-http on top of that
+  // one. Without it every `/api` request is logged twice, because pino-http has
+  // no guard against running twice: version 11 sets no "already handled" marker,
+  // so both instances log independently and the only visible difference is that
+  // the second has been through routing and carries `params`.
+  //
+  // What remains is the middleware that binds the request logger into async
+  // local storage. That is not optional. It is what gives a log line written
+  // inside a handler the same request id as the request line itself.
+  useExisting: true,
+
   // Express 5 rejects the bare `*` this middleware registers by default, so Nest
   // logs a legacy route conversion warning on every boot. Registering the named
   // wildcard keeps the same coverage without the warning.
   //
   // It must be `*splat`. The `{*path}` form that Nest names in its own warning
   // message matches nothing here, and fails silently: the middleware stops
-  // running, so requests are no longer logged and no error is raised.
-  //
-  // Nest applies the global prefix to a middleware path, so this covers `/api`
-  // and nothing else. Everything outside it, `/`, `/favicon.ico`, `/docs`, and
-  // any typo a client sends, was reaching the exception filter with no request
-  // log and an empty request id, which made a 404 both invisible and
-  // unattributable. `bootstrapNestServer` registers the same middleware at the
-  // Express level, before routing, so those requests are logged too.
+  // running, so the request id is never bound and no error is raised.
   forRoutes: [{ path: '*splat', method: RequestMethod.ALL }],
 
   pinoHttp: {
@@ -96,10 +106,17 @@ export const buildLoggerOptions = (appConfig: IAppConfig): Params => ({
       log: redactEntry,
     },
 
-    // Stamped on every request line so it reads like the rest of the log. Without
-    // it the framework's own lines carry a context and the request lines do not,
-    // and a reader filtering by context silently loses the requests.
-    customProps: (): Record<string, string> => ({ context: REQUEST_LOG_CONTEXT }),
+    // Two jobs. It stamps the request context, without which the framework's own
+    // lines carry one and the request lines do not, so a reader filtering by
+    // context silently loses the requests. And it adds the parsed request body,
+    // scrubbed.
+    //
+    // It has to be `customProps` rather than a `req` serialiser. pino serialises
+    // a child logger's bindings when the child is created, which pino-http does
+    // on entering the middleware, before any body parser has run. `customProps`
+    // is evaluated when the line is written, on response finish, which is the
+    // only point where the body exists.
+    customProps: buildRequestProps,
 
     customSuccessMessage: (req: IncomingMessage, res: ServerResponse): string =>
       `${req.method ?? 'GET'} ${req.url ?? ''} ${res.statusCode}`,

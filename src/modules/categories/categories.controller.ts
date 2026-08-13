@@ -3,6 +3,7 @@ import {
   ApiBearerAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -77,10 +78,13 @@ Archived categories are excluded by default, because a picker wants only what ca
 
 Names are compared case and spacing insensitively, so "Cloud Hosting" and "cloud  hosting" collide and the second is rejected. Without that, a picker ends up showing what looks like the same category twice and a report splits the same spend across both.
 
-Creating a category with the same name as a shared one is allowed. The account's own category takes precedence when a CSV import resolves that name.`,
+The comparison covers **everything the caller can see**, their own categories and the shared catalogue alike, so a personal category cannot take the name of a shared one. The database constraint alone does not prevent that, since it is keyed on the owner and the two rows have different owners.`,
   })
   @ApiCreatedResponse({ description: 'The category was created.', type: CategoryResponseDTO })
-  @ApiConflictResponse({ description: 'The caller already has a category with that name.', type: ErrorResponseDTO })
+  @ApiConflictResponse({
+    description: 'The name is already used by one of the caller’s categories or by the shared catalogue.',
+    type: ErrorResponseDTO,
+  })
   async create(
     @CurrentUser() user: IAuthenticatedUser,
     @Body() input: CreateCategoryDTO,
@@ -106,13 +110,19 @@ Creating a category with the same name as a shared one is allowed. The account's
     summary: 'Rename or archive a category',
     description: `Changes the name, the archived state, or both. Anything omitted is left alone.
 
-Only the caller's own categories can be changed. A shared catalogue entry answers 404 rather than explaining the rule, because a client should already know from the \`shared\` flag and there is nothing useful to reveal.
+Only the caller's own categories can be changed. A shared catalogue entry, which the list marks with \`shared: true\`, answers **403** and says so. It is listed to the caller, so answering "not found" would contradict the list they just read and leave a client unable to tell a read only category from a missing one.
+
+An id belonging to another account answers **404**, the same as an id that never existed, because confirming it exists would reveal that another account holds it.
 
 Archiving hides a category from pickers without affecting anything historic: existing plans and expenses keep resolving it and reports are unchanged. It is almost always what someone wants instead of deleting.`,
   })
   @ApiOkResponse({ description: 'The updated category.', type: CategoryResponseDTO })
-  @ApiNotFoundResponse({ description: 'The caller does not own a category with that id.', type: ErrorResponseDTO })
-  @ApiConflictResponse({ description: 'The new name collides with another of the caller’s categories.', type: ErrorResponseDTO })
+  @ApiForbiddenResponse({ description: 'The id is a shared catalogue entry, which cannot be changed.', type: ErrorResponseDTO })
+  @ApiNotFoundResponse({ description: 'No category with that id belongs to the caller.', type: ErrorResponseDTO })
+  @ApiConflictResponse({
+    description: 'The new name is already used by one of the caller’s categories or by the shared catalogue.',
+    type: ErrorResponseDTO,
+  })
   async update(
     @CurrentUser() user: IAuthenticatedUser,
     @Param('categoryId', ParseObjectIdPipe) categoryId: Types.ObjectId,
@@ -142,10 +152,11 @@ The delete is soft. The record survives so that plans and expenses in a locked p
 
 Consider archiving instead. Deleting a category that already has spend against it makes those records harder to read, while archiving hides it from pickers and leaves history intact.
 
-A shared catalogue entry answers 404.`,
+A shared catalogue entry, marked \`shared: true\` in the list, answers **403**: the seeded catalogue belongs to every account, so no one account may remove an entry from under the others. An id belonging to another account answers **404**.`,
   })
   @ApiNoContentResponse({ description: 'The category was deleted.' })
-  @ApiNotFoundResponse({ description: 'The caller does not own a category with that id.', type: ErrorResponseDTO })
+  @ApiForbiddenResponse({ description: 'The id is a shared catalogue entry, which cannot be deleted.', type: ErrorResponseDTO })
+  @ApiNotFoundResponse({ description: 'No category with that id belongs to the caller.', type: ErrorResponseDTO })
   async remove(
     @CurrentUser() user: IAuthenticatedUser,
     @Param('categoryId', ParseObjectIdPipe) categoryId: Types.ObjectId,
