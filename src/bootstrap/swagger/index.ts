@@ -1,5 +1,5 @@
 import { INestApplication } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import { SwaggerTheme, SwaggerThemeNameEnum } from 'swagger-themes';
 import { CaseInsensitiveSearchPlugin } from './plugins';
 
@@ -43,31 +43,72 @@ const API_DESCRIPTION = `Monthly spending targets, logged actuals, and variance 
 **Sessions** travel in the \`Authorization\` header, never a cookie, so a mobile or desktop client is a first class caller. Access tokens are RS256 signed and short lived; refresh tokens are opaque, single use, and rotate.`;
 
 /**
+ * The groups operations are organised into, with what each one is for.
+ *
+ * @remarks
+ * A tag used by a controller but not declared here still groups correctly, but
+ * its group has no description. Declaring them means the sidebar explains itself.
+ */
+const API_TAGS: { name: string; description: string }[] = [
+  { name: 'Auth', description: 'Establishing, renewing, and ending sessions.' },
+  { name: 'Account', description: 'The signed in account and the settings reports are computed against.' },
+  { name: 'Categories', description: 'The shared catalogue and the account’s own categories.' },
+  { name: 'Period locks', description: 'Closing and reopening accounting periods. A closed period is read only.' },
+  { name: 'Audit log', description: 'The append only trail of changes to financial data.' },
+  { name: 'Health', description: 'Liveness and readiness probes.' },
+];
+
+/**
+ * Builds the OpenAPI document description.
+ *
+ * @remarks
+ * Shared by the running server and by the script that writes `openapi.json`, so
+ * the committed contract and the served documentation cannot describe the API
+ * differently.
+ *
+ * @param version - The API document version, from application config.
+ * @returns The document configuration.
+ */
+export const buildOpenApiConfig = (version: string): Omit<OpenAPIObject, 'paths'> => {
+  const builder = new DocumentBuilder()
+    .setTitle('Plan vs Actual API')
+    .setDescription(API_DESCRIPTION)
+    .setVersion(version)
+    .addBearerAuth();
+
+  for (const tag of API_TAGS) {
+    builder.addTag(tag.name, tag.description);
+  }
+
+  return builder.build();
+};
+
+/**
+ * Builds the OpenAPI document for an application.
+ *
+ * @param app - The application to describe.
+ * @param version - The API document version.
+ * @returns The document.
+ */
+export const buildOpenApiDocument = (app: INestApplication, version: string): OpenAPIObject =>
+  SwaggerModule.createDocument(app, buildOpenApiConfig(version));
+
+/**
  * Mounts the dark themed Swagger UI at `/docs`.
  *
  * @remarks
- * Not mounted in production or test. The generated document is also the contract
- * the web client builds its types from, which is why every DTO carries Swagger
- * decorators: an undocumented field effectively does not exist.
+ * Not mounted in production or test. The same document is written to
+ * `openapi.json` for clients that generate their types offline, which the web
+ * client in its own repository does.
  *
  * @param app - The application to attach the OpenAPI document and UI to.
  * @param version - The API document version, from application config.
  */
 export const setupSwagger = (app: INestApplication, version: string): void => {
-  const config = new DocumentBuilder()
-    .setTitle('Plan vs Actual API')
-    .setDescription(API_DESCRIPTION)
-    .setVersion(version)
-    .addBearerAuth()
-    .build();
-
-  const document = SwaggerModule.createDocument(app, config);
-  const theme = new SwaggerTheme();
-
-  SwaggerModule.setup('docs', app, document, {
+  SwaggerModule.setup('docs', app, buildOpenApiDocument(app, version), {
     explorer: true,
     customSiteTitle: 'Plan vs Actual API',
-    customCss: theme.getBuffer(SwaggerThemeNameEnum.DARK),
+    customCss: new SwaggerTheme().getBuffer(SwaggerThemeNameEnum.DARK),
     swaggerOptions: SWAGGER_UI_OPTIONS,
   });
 };

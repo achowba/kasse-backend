@@ -23,6 +23,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json --passWithNoTests",
+    "openapi:emit": "UPDATE_OPENAPI=true jest --config ./test/jest-e2e.json --runTestsByPath test/openapi.e2e-spec.ts",
     "prepare": "husky || true",
     "commitlint": "commitlint --edit"
   },

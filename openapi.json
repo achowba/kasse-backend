@@ -1,0 +1,1851 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/v1/auth/signup": {
+      "post": {
+        "description": "Creates an account and returns a token pair, so a client does not have to log in immediately afterwards.\n\nThe password must be at least 12 characters. There are no composition rules: length is what resists an offline attack, while symbol requirements mostly produce predictable substitutions. It is hashed with Argon2id and never stored, logged, or returned.\n\nThis is the only route that admits an address is already registered, because a registration form cannot be usable otherwise. Login never distinguishes an unknown address from a wrong password.",
+        "operationId": "AuthController_signup_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialsDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The account was created and a session started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDTO"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The email address is already registered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts. Wait and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Register an account",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "description": "Exchanges an email and password for a token pair.\n\nAn unknown address and a wrong password return the same 401 with the same message, and take the same amount of work, so this endpoint cannot be used to discover which addresses are registered.\n\nSend the access token as `Authorization: Bearer <token>`. It is short lived; use the refresh token to get a new one rather than asking for the password again.",
+        "operationId": "AuthController_login_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialsDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The session was started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The email or password is wrong.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts. Wait and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Start a session",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "description": "Exchanges a refresh token for a new access and refresh token pair.\n\nRefresh tokens are single use. The presented token is revoked as part of the exchange, so the new one must replace it on the client. Both operations happen in one transaction, so a failure cannot leave a session without a usable refresh token.\n\nPresenting a token that was already exchanged means the token leaked, and every session descended from that login is revoked. Both the legitimate user and whoever stole the token are signed out, which is deliberate: a noisy failure is better than a quiet ongoing compromise.\n\nNo access token is required, since the refresh token is itself the credential.",
+        "operationId": "AuthController_refresh_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A new token pair.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The token is unknown, already used, expired, or its account no longer exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts. Wait and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Renew a session",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "description": "Revokes the refresh token supplied in the body, ending that session.\n\nIdempotent: a token that is unknown, already revoked, or belongs to another account produces the same 204, because in every case the caller's intent is satisfied and the session is not active. It also means this cannot be used to probe for another account's tokens.\n\nThe access token is not revoked and remains valid until it expires, which is minutes. That is the tradeoff of stateless verification.",
+        "operationId": "AuthController_logout_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "The session is no longer active."
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts. Wait and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "End the current session",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/sessions": {
+      "get": {
+        "description": "Returns every live, unexpired session on the account, newest first.\n\nSessions are identified by when they started and when they were last used, not by a device or browser name. Producing such a name means storing the user agent, and this service does not persist identifiers it does not need.",
+        "operationId": "AuthController_listSessions_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The active sessions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionResponseDTO"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts. Wait and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List active sessions",
+        "tags": [
+          "Auth"
+        ]
+      },
+      "delete": {
+        "description": "Revokes every refresh token on the account, including the one belonging to the caller.\n\nEnding the current session too is deliberate. The reason to press \"sign out everywhere\" is usually not knowing which device is compromised, and sparing the device in your hand would defeat that.\n\nExisting access tokens stay valid until they expire, which is minutes.",
+        "operationId": "AuthController_revokeAllSessions_v1",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Every session was ended."
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts. Wait and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "End every session",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/auth/sessions/{sessionId}": {
+      "delete": {
+        "description": "Revokes a single session by its identifier, taken from the session list.\n\nA session belonging to another account answers 404 rather than 403, so this cannot be used to confirm that another account's session exists.",
+        "operationId": "AuthController_revokeSession_v1",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "description": "Identifier from the session list.",
+            "schema": {
+              "example": "65f1c2d3e4b5a6c7d8e9f0a1",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ObjectId"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The session was ended."
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such live session on this account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts. Wait and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "End one session",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "description": "Returns the account the access token belongs to, including the currency and fiscal year start that reports are computed against. The password hash is never returned.",
+        "operationId": "UsersController_getMe_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The signed in account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The account no longer exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read the signed in account",
+        "tags": [
+          "Account"
+        ]
+      },
+      "patch": {
+        "description": "Changes the currency or the month the fiscal year starts in. Both are optional; anything omitted is left alone.\n\nChanging the currency relabels amounts rather than converting them. Amounts are stored as minor units with no currency of their own, so existing plans and actuals keep their numeric value.\n\nThe email address is not changeable here, because it is the login identity and moving it needs a verification flow.",
+        "operationId": "UsersController_updateMe_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMeDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The account no longer exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update account settings",
+        "tags": [
+          "Account"
+        ]
+      }
+    },
+    "/api/v1/audit-log": {
+      "get": {
+        "description": "Returns changes to this account's financial data, newest first.\n\nEvery change to a plan, an actual, a category, or a period lock is recorded with the state before and after, so the trail answers what changed rather than only what the record says now. Because deletes are soft and audited, a deleted record's last known state is still readable here.\n\nEach entry carries the `requestId` of the request that made the change, which matches the `x-request-id` response header and the service logs for the same request.\n\nFilter by `entity` and `entityId` to read the history of one record.\n\nThe trail is append only. No route in this API can edit or remove an entry.",
+        "operationId": "AuditLogController_list_v1",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "How many records to return.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "description": "How many records to skip.",
+            "schema": {
+              "minimum": 0,
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "entity",
+            "required": false,
+            "in": "query",
+            "description": "Restrict to one kind of record.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CATEGORY",
+                "PLAN",
+                "ACTUAL",
+                "PERIOD_LOCK",
+                "IMPORT_BATCH"
+              ]
+            }
+          },
+          {
+            "name": "action",
+            "required": false,
+            "in": "query",
+            "description": "Restrict to one kind of change.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CATEGORY_CREATED",
+                "CATEGORY_UPDATED",
+                "CATEGORY_DELETED",
+                "PLAN_CREATED",
+                "PLAN_UPDATED",
+                "PLAN_DELETED",
+                "ACTUAL_CREATED",
+                "ACTUAL_UPDATED",
+                "ACTUAL_DELETED",
+                "PERIOD_LOCKED",
+                "PERIOD_UNLOCKED",
+                "IMPORT_COMPLETED"
+              ]
+            }
+          },
+          {
+            "name": "entityId",
+            "required": false,
+            "in": "query",
+            "description": "Restrict to the history of a single record.",
+            "schema": {
+              "example": "65f1c2d3e4b5a6c7d8e9f0a2",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the audit trail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEntryResponseDTO"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read the audit trail",
+        "tags": [
+          "Audit log"
+        ]
+      }
+    },
+    "/api/v1/categories": {
+      "get": {
+        "description": "Returns the caller's own categories together with the shared catalogue, sorted by name.\n\nEach entry reports whether it is `shared`. A shared category can be selected by any account but cannot be renamed, archived, or deleted, so a client should not offer those actions for it.\n\nArchived categories are excluded by default, because a picker wants only what can be chosen now. Pass `includeArchived=true` to see them; they still resolve in existing plans, actuals, and reports.",
+        "operationId": "CategoriesController_list_v1",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "How many records to return.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "description": "How many records to skip.",
+            "schema": {
+              "minimum": 0,
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "includeArchived",
+            "required": false,
+            "in": "query",
+            "description": "Include categories that have been archived. Off by default, since a picker wants only selectable ones.",
+            "schema": {
+              "default": false,
+              "example": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of selectable categories.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CategoryResponseDTO"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List selectable categories",
+        "tags": [
+          "Categories"
+        ]
+      },
+      "post": {
+        "description": "Creates a category owned by the caller, alongside the shared catalogue.\n\nNames are compared case and spacing insensitively, so \"Cloud Hosting\" and \"cloud  hosting\" collide and the second is rejected. Without that, a picker ends up showing what looks like the same category twice and a report splits the same spend across both.\n\nCreating a category with the same name as a shared one is allowed. The account's own category takes precedence when a CSV import resolves that name.",
+        "operationId": "CategoriesController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCategoryDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The category was created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The caller already has a category with that name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a category",
+        "tags": [
+          "Categories"
+        ]
+      }
+    },
+    "/api/v1/categories/{categoryId}": {
+      "patch": {
+        "description": "Changes the name, the archived state, or both. Anything omitted is left alone.\n\nOnly the caller's own categories can be changed. A shared catalogue entry answers 404 rather than explaining the rule, because a client should already know from the `shared` flag and there is nothing useful to reveal.\n\nArchiving hides a category from pickers without affecting anything historic: existing plans and actuals keep resolving it and reports are unchanged. It is almost always what someone wants instead of deleting.",
+        "operationId": "CategoriesController_update_v1",
+        "parameters": [
+          {
+            "name": "categoryId",
+            "required": true,
+            "in": "path",
+            "description": "Identifier from the category list.",
+            "schema": {
+              "example": "65f1c2d3e4b5a6c7d8e9f0a1",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ObjectId"
+                }
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCategoryDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated category.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoryResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The caller does not own a category with that id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The new name collides with another of the caller’s categories.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rename or archive a category",
+        "tags": [
+          "Categories"
+        ]
+      },
+      "delete": {
+        "description": "Removes a category the caller owns from every list.\n\nThe delete is soft. The record survives so that plans and actuals in a locked period keep resolving the name they referenced, and so a mistaken delete is recoverable without a database restore. The change is recorded in the audit log with the category's last state.\n\nConsider archiving instead. Deleting a category that already has spend against it makes those records harder to read, while archiving hides it from pickers and leaves history intact.\n\nA shared catalogue entry answers 404.",
+        "operationId": "CategoriesController_remove_v1",
+        "parameters": [
+          {
+            "name": "categoryId",
+            "required": true,
+            "in": "path",
+            "description": "Identifier from the category list.",
+            "schema": {
+              "example": "65f1c2d3e4b5a6c7d8e9f0a1",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ObjectId"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The category was deleted."
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The caller does not own a category with that id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a category",
+        "tags": [
+          "Categories"
+        ]
+      }
+    },
+    "/api/v1/period-locks": {
+      "get": {
+        "description": "Returns the months that are closed, oldest first, optionally within a range.\n\nNot paginated. An account has at most a handful of locked months per year, and a client needs all of them at once to mark the right rows read only in a report.\n\nThe absence of a month from this list is what \"open\" means. There is no unlocked record.",
+        "operationId": "PeriodLocksController_list_v1",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "First month of the range, inclusive.",
+            "schema": {
+              "example": "2026-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Last month of the range, inclusive.",
+            "schema": {
+              "example": "2026-12",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The closed periods.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PeriodLockResponseDTO"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List closed periods",
+        "tags": [
+          "Period locks"
+        ]
+      },
+      "post": {
+        "description": "Closes months so their plans and actuals become read only.\n\nSupply either `months` or `quarter`. A quarter expands to its three calendar months, so the stored shape is always one record per month and a single month of a closed quarter can be reopened without a special case.\n\nClosing an already closed month is harmless: it is skipped and its original time is preserved, so locking a quarter that overlaps a month closed earlier does not rewrite when that happened. The response lists only the months this call actually closed.\n\nAfterwards, any attempt to create, change, or delete a plan or an actual in those months is rejected with `423` and the code `PERIOD_LOCKED`, including rows inside a CSV import. Moving a record out of a closed month is rejected too, because that changes the closed month's totals.",
+        "operationId": "PeriodLocksController_lock_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePeriodLockDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The months this call closed. Already closed months are omitted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Neither months nor a quarter was supplied, or a month was malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Close periods",
+        "tags": [
+          "Period locks"
+        ]
+      }
+    },
+    "/api/v1/period-locks/{month}": {
+      "delete": {
+        "description": "Reopens a single month, making its plans and actuals editable again.\n\nReopening is recorded in the audit log, with the month and the request that did it, so a period that was closed and then reopened leaves a trail rather than looking as though it was never closed.\n\nA month that is not closed answers 404.",
+        "operationId": "PeriodLocksController_unlock_v1",
+        "parameters": [
+          {
+            "name": "month",
+            "required": true,
+            "in": "path",
+            "description": "The month to reopen, as YYYY-MM.",
+            "schema": {
+              "example": "2026-01",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The period is open."
+          },
+          "400": {
+            "description": "The month is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "That month is not closed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reopen a period",
+        "tags": [
+          "Period locks"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "description": "Answers whether the process is running. Checks no dependency.",
+        "operationId": "HealthController_liveness_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The Health Check is successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    },
+                    "info": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "example": {},
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "details": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Health Check is not successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "error"
+                    },
+                    "info": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "example": {
+                        "redis": {
+                          "status": "down",
+                          "message": "Could not connect"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "details": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        },
+                        "redis": {
+                          "status": "down",
+                          "message": "Could not connect"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Liveness probe",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "description": "Answers whether this instance can serve requests.",
+        "operationId": "HealthController_readiness_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The Health Check is successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    },
+                    "info": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "example": {},
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "details": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Health Check is not successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "error"
+                    },
+                    "info": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "example": {
+                        "redis": {
+                          "status": "down",
+                          "message": "Could not connect"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "details": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        },
+                        "redis": {
+                          "status": "down",
+                          "message": "Could not connect"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Readiness probe",
+        "tags": [
+          "Health"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Plan vs Actual API",
+    "description": "Monthly spending targets, logged actuals, and variance reporting with locked periods.\n\n**Money** is an integer count of minor units. A field ending in `Minor` holds cents.\n\n**Months** are the string `YYYY-MM`.\n\n**Variance** is `actual - plan`. Variance percent is `null` when the plan is zero, never `NaN`.\n\n**Missing actuals** default to `0`. Pass `missingActuals=null` to receive `null` instead. Every report row carries `hasActual`, so a logged zero is never confused with nothing logged.\n\n**Locked periods** reject writes with `423` and the code `PERIOD_LOCKED`.\n\n**Deletes are soft.** A `DELETE` answers `204` and the record stops appearing in reads.\n\n**Sessions** travel in the `Authorization` header, never a cookie, so a mobile or desktop client is a first class caller. Access tokens are RS256 signed and short lived; refresh tokens are opaque, single use, and rotate.",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [
+    {
+      "name": "Auth",
+      "description": "Establishing, renewing, and ending sessions."
+    },
+    {
+      "name": "Account",
+      "description": "The signed in account and the settings reports are computed against."
+    },
+    {
+      "name": "Categories",
+      "description": "The shared catalogue and the account’s own categories."
+    },
+    {
+      "name": "Period locks",
+      "description": "Closing and reopening accounting periods. A closed period is read only."
+    },
+    {
+      "name": "Audit log",
+      "description": "The append only trail of changes to financial data."
+    },
+    {
+      "name": "Health",
+      "description": "Liveness and readiness probes."
+    }
+  ],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "ErrorResponseDTO": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "description": "HTTP status, repeated in the body.",
+            "example": 423
+          },
+          "code": {
+            "type": "string",
+            "description": "Stable code a client branches on. Never parse the message.",
+            "enum": [
+              "VALIDATION_FAILED",
+              "UNAUTHENTICATED",
+              "FORBIDDEN",
+              "NOT_FOUND",
+              "CONFLICT",
+              "IMPORT_VALIDATION_FAILED",
+              "PERIOD_LOCKED",
+              "RATE_LIMITED",
+              "INTERNAL"
+            ],
+            "example": "PERIOD_LOCKED"
+          },
+          "message": {
+            "type": "string",
+            "description": "What went wrong, written for a person.",
+            "example": "2026-01 is locked and cannot be edited."
+          },
+          "details": {
+            "type": "object",
+            "description": "Machine readable specifics: the offending month, the failing rows, the invalid fields.",
+            "example": {
+              "month": "2026-01"
+            }
+          },
+          "requestId": {
+            "type": "string",
+            "description": "Correlates this response with its log lines and the x-request-id header.",
+            "example": "0f9c1e2a-7b3d-4c5e-9a8f-1b2c3d4e5f6a"
+          },
+          "path": {
+            "type": "string",
+            "description": "The path that produced the error.",
+            "example": "/api/v1/plans"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "When the error was produced.",
+            "example": "2026-01-15T10:04:11.212Z",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "statusCode",
+          "code",
+          "message",
+          "requestId",
+          "path",
+          "timestamp"
+        ]
+      },
+      "CredentialsDTO": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Login address.",
+            "example": "finance@acme.test",
+            "format": "email",
+            "maxLength": 254
+          },
+          "password": {
+            "type": "string",
+            "description": "Password. At least 12 characters. No composition rules: length is what resists an offline attack.",
+            "example": "correct horse battery staple",
+            "minLength": 12,
+            "maxLength": 128,
+            "format": "password"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "UserResponseDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identifier of the account.",
+            "example": "65f1c2d3e4b5a6c7d8e9f0a1"
+          },
+          "email": {
+            "type": "string",
+            "description": "Login address.",
+            "example": "finance@acme.test",
+            "format": "email"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency every amount on this account is denominated in.",
+            "enum": [
+              "USD",
+              "AED"
+            ],
+            "example": "USD"
+          },
+          "fiscalYearStartMonth": {
+            "type": "number",
+            "description": "Month the fiscal year starts. January means the fiscal year is the calendar year.",
+            "example": 1,
+            "minimum": 1,
+            "maximum": 12
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the account was created.",
+            "example": "2026-01-15T10:04:11.212Z",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "currency",
+          "fiscalYearStartMonth",
+          "createdAt"
+        ]
+      },
+      "AuthResponseDTO": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "Short lived access token. Send as `Authorization: Bearer <token>`.",
+            "example": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "expiresIn": {
+            "type": "number",
+            "description": "Seconds until the access token expires.",
+            "example": 900
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Long lived refresh token. Single use: exchanging it returns a new pair and invalidates this one. Presenting it twice revokes every session descended from this login.",
+            "example": "V2hhdCBhIGxvdmVseSBkYXkgZm9yIGEgcmVmcmVzaCB0b2tlbg"
+          },
+          "user": {
+            "description": "The account this session belongs to.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserResponseDTO"
+              }
+            ]
+          }
+        },
+        "required": [
+          "accessToken",
+          "expiresIn",
+          "refreshToken",
+          "user"
+        ]
+      },
+      "RefreshTokenDTO": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "The refresh token issued by signup, login, or a previous refresh.",
+            "example": "V2hhdCBhIGxvdmVseSBkYXkgZm9yIGEgcmVmcmVzaCB0b2tlbg",
+            "minLength": 20,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "SessionResponseDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identifier, used to revoke this session.",
+            "example": "65f1c2d3e4b5a6c7d8e9f0a1"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the session was established.",
+            "example": "2026-01-15T10:04:11.212Z",
+            "format": "date-time"
+          },
+          "lastUsedAt": {
+            "type": "object",
+            "description": "When this session last refreshed. Null if it never has.",
+            "example": "2026-01-16T08:12:00.000Z",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "When the session expires.",
+            "example": "2026-01-22T10:04:11.212Z",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "lastUsedAt",
+          "expiresAt"
+        ]
+      },
+      "ObjectId": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateMeDTO": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "description": "Currency the account is denominated in. Changing it relabels existing amounts, it does not convert them.",
+            "enum": [
+              "USD",
+              "AED"
+            ],
+            "example": "AED"
+          },
+          "fiscalYearStartMonth": {
+            "type": "number",
+            "description": "Month the fiscal year starts. 1 is January, which makes the fiscal year the calendar year.",
+            "example": 4,
+            "minimum": 1,
+            "maximum": 12
+          }
+        }
+      },
+      "AuditEntryResponseDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identifier of the entry.",
+            "example": "65f1c2d3e4b5a6c7d8e9f0a1"
+          },
+          "action": {
+            "type": "string",
+            "description": "What happened.",
+            "enum": [
+              "CATEGORY_CREATED",
+              "CATEGORY_UPDATED",
+              "CATEGORY_DELETED",
+              "PLAN_CREATED",
+              "PLAN_UPDATED",
+              "PLAN_DELETED",
+              "ACTUAL_CREATED",
+              "ACTUAL_UPDATED",
+              "ACTUAL_DELETED",
+              "PERIOD_LOCKED",
+              "PERIOD_UNLOCKED",
+              "IMPORT_COMPLETED"
+            ],
+            "example": "PLAN_UPDATED"
+          },
+          "entity": {
+            "type": "string",
+            "description": "What kind of record it happened to.",
+            "enum": [
+              "CATEGORY",
+              "PLAN",
+              "ACTUAL",
+              "PERIOD_LOCK",
+              "IMPORT_BATCH"
+            ],
+            "example": "PLAN"
+          },
+          "entityId": {
+            "type": "object",
+            "description": "Which record.",
+            "example": "65f1c2d3e4b5a6c7d8e9f0a2",
+            "nullable": true
+          },
+          "before": {
+            "type": "object",
+            "description": "State before the change. Null on a creation.",
+            "example": {
+              "targetMinor": 500000
+            },
+            "nullable": true
+          },
+          "after": {
+            "type": "object",
+            "description": "State after the change. Null on a deletion.",
+            "example": {
+              "targetMinor": 600000
+            },
+            "nullable": true
+          },
+          "requestId": {
+            "type": "object",
+            "description": "The request that made the change. Matches the x-request-id header and the log lines.",
+            "example": "0f9c1e2a-7b3d-4c5e-9a8f-1b2c3d4e5f6a",
+            "nullable": true
+          },
+          "at": {
+            "type": "string",
+            "description": "When it happened.",
+            "example": "2026-01-15T10:04:11.212Z",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "entity",
+          "at"
+        ]
+      },
+      "CategoryResponseDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identifier, used when creating a plan or an actual.",
+            "example": "65f1c2d3e4b5a6c7d8e9f0a1"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name as written.",
+            "example": "Cloud Hosting"
+          },
+          "shared": {
+            "type": "boolean",
+            "description": "Whether this comes from the shared catalogue. Shared categories are readable by every account and editable by none.",
+            "example": false
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether it is hidden from pickers. An archived category still resolves in existing plans and reports.",
+            "example": false
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "shared",
+          "archived"
+        ]
+      },
+      "CreateCategoryDTO": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name as it should be displayed. Uniqueness is checked case and spacing insensitively, so \"Cloud Hosting\" and \"cloud  hosting\" are the same category.",
+            "example": "Cloud Hosting",
+            "minLength": 1,
+            "maxLength": 60
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateCategoryDTO": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "A new display name.",
+            "example": "Cloud Infrastructure",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Hide the category from pickers without removing it. Existing plans and actuals keep resolving it, and reports are unaffected.",
+            "example": true
+          }
+        }
+      },
+      "PeriodLockResponseDTO": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "description": "The closed month.",
+            "example": "2026-01"
+          },
+          "lockedAt": {
+            "type": "string",
+            "description": "When it was closed.",
+            "example": "2026-02-01T09:00:00.000Z",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "month",
+          "lockedAt"
+        ]
+      },
+      "CreatePeriodLockDTO": {
+        "type": "object",
+        "properties": {
+          "months": {
+            "description": "Months to close, each as YYYY-MM. Locking a month that is already closed is harmless.",
+            "example": [
+              "2026-01",
+              "2026-02"
+            ],
+            "maxItems": 15,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "quarter": {
+            "type": "string",
+            "description": "A calendar quarter to close, which expands to its three months. Q1 is January through March.",
+            "example": "2026-Q1"
+          }
+        }
+      }
+    }
+  }
+}
