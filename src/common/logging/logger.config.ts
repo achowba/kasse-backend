@@ -33,6 +33,28 @@ const REDACTED_PATHS = [
 const UNLOGGED_PATHS = ['/api/v1/health', '/api/v1/health/ready', '/docs', '/docs-json'];
 
 /**
+ * Reports whether the pretty printing transport is installed.
+ *
+ * @remarks
+ * `pino-pretty` is a development dependency, so it is absent from the production
+ * image. Selecting the transport on environment alone would crash the process at
+ * boot with "unable to determine transport target" whenever a production build
+ * runs with `NODE_ENV=development`, which is exactly what a containerised local
+ * run does. Checking that it resolves degrades to JSON logs instead.
+ *
+ * @returns True when `pino-pretty` can be loaded.
+ */
+const isPrettyPrintAvailable = (): boolean => {
+  try {
+    require.resolve('pino-pretty');
+
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
  * Builds the pino options used by the application logger.
  *
  * @remarks
@@ -89,7 +111,7 @@ export const buildLoggerOptions = (appConfig: IAppConfig): Params => ({
     },
 
     transport:
-      appConfig.nodeEnv === NodeEnvEnum.DEVELOPMENT
+      appConfig.nodeEnv === NodeEnvEnum.DEVELOPMENT && isPrettyPrintAvailable()
         ? { target: 'pino-pretty', options: { singleLine: true, translateTime: 'SYS:HH:MM:ss.l', ignore: 'pid,hostname' } }
         : undefined,
   },
