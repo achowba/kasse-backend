@@ -23,3 +23,19 @@ export interface IAppConfig {
   logLevel: string;
   allowedOrigins: string[];
 }
+
+/**
+ * Database configuration.
+ *
+ * @remarks
+ * Kept in its own namespace so the persistence layer depends on the database
+ * settings alone, rather than on everything the application happens to know.
+ *
+ * @property uri - MongoDB connection string. The server must be a replica set
+ *   member, because writes that span documents run in a transaction.
+ * @property autoIndex - Whether Mongoose builds declared indexes at startup.
+ */
+export interface IDatabaseConfig {
+  uri: string;
+  autoIndex: boolean;
+}

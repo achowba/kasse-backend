@@ -89,6 +89,10 @@ export default tseslint.config(
       // Jest matchers reference mocked class methods unbound; use the jest-aware rule.
       '@typescript-eslint/unbound-method': 'off',
       'jest/unbound-method': 'error',
+
+      // supertest asserts through its own chained .expect(), which the rule does
+      // not recognise as an assertion by default.
+      'jest/expect-expect': ['error', { assertFunctionNames: ['expect', 'request.**.expect'] }],
     },
   },
   prettier,

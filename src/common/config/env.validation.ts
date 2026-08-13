@@ -1,17 +1,24 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min, validateSync } from 'class-validator';
+import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min, validateSync } from 'class-validator';
 import { NodeEnvEnum } from '@common/enums';
 
 /**
  * Shape of the environment this service accepts.
  *
  * @remarks
- * Every field is optional with a documented default, so the service boots on a
- * clean checkout. A field becomes required in the release that first depends
- * on it, which keeps a missing variable a boot failure rather than a runtime
- * surprise.
+ * A field becomes required in the release that first depends on it, which keeps
+ * a missing variable a boot failure rather than a runtime surprise. Everything
+ * still optional carries a documented default.
  */
 export class EnvironmentVariables {
+  /*
+   * Required: the service cannot serve a request without a database, so an
+   * absent or empty value is a boot failure rather than a runtime surprise.
+   */
+  @IsString()
+  @IsNotEmpty()
+  MONGODB_URI!: string;
+
   @IsOptional()
   @IsEnum(NodeEnvEnum)
   NODE_ENV?: NodeEnvEnum;

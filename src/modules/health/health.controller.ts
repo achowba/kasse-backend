@@ -6,11 +6,15 @@ import {
   HealthCheckService,
   HealthIndicatorResult,
   MemoryHealthIndicator,
+  MongooseHealthIndicator,
 } from '@nestjs/terminus';
 import { ApiVersionEnum } from '@common/enums';
 
 /** Heap ceiling above which the process is considered unhealthy. */
 const HEAP_LIMIT_BYTES = 512 * 1024 * 1024;
+
+/** How long the database ping may take before readiness fails. */
+const DATABASE_PING_TIMEOUT_MS = 1_500;
 
 /**
  * Liveness and readiness probes.
@@ -27,6 +31,7 @@ export class HealthController {
   constructor(
     private readonly healthCheckService: HealthCheckService,
     private readonly memoryHealthIndicator: MemoryHealthIndicator,
+    private readonly mongooseHealthIndicator: MongooseHealthIndicator,
   ) {}
 
   /**
@@ -45,9 +50,9 @@ export class HealthController {
    * Reports whether this instance should receive traffic.
    *
    * @remarks
-   * Currently heap only. The database indicator is added with the persistence
-   * layer, at which point the container healthcheck moves from a TCP connect to
-   * this endpoint.
+   * Checks the database and the heap. The database ping is bounded, so an
+   * unreachable server fails readiness quickly instead of holding the probe open
+   * until the platform times it out.
    *
    * @returns The aggregated result of every readiness indicator.
    */
@@ -56,6 +61,8 @@ export class HealthController {
   @ApiOperation({ summary: 'Readiness probe', description: 'Answers whether this instance can serve requests.' })
   async readiness(): Promise<HealthCheckResult> {
     return await this.healthCheckService.check([
+      async (): Promise<HealthIndicatorResult> =>
+        await this.mongooseHealthIndicator.pingCheck('database', { timeout: DATABASE_PING_TIMEOUT_MS }),
       async (): Promise<HealthIndicatorResult> => await this.memoryHealthIndicator.checkHeap('memory_heap', HEAP_LIMIT_BYTES),
     ]);
   }
