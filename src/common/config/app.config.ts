@@ -29,6 +29,10 @@ const parseOrigins = (value: string | undefined): string[] =>
 export const appConfig = registerAs('app', (): IAppConfig => ({
   nodeEnv: (process.env['NODE_ENV'] as NodeEnvEnum | undefined) ?? NodeEnvEnum.DEVELOPMENT,
   port: Number(process.env['PORT'] ?? DEFAULT_PORT),
+  // Empty counts as absent. A platform variable left blank would otherwise
+  // produce a base URL of "", which reads as a relative path and is worse
+  // than having none.
+  publicUrl: (process.env['PUBLIC_URL'] ?? '').trim() || null,
   version: API_DOC_VERSION,
   logLevel: process.env['LOG_LEVEL'] ?? DEFAULT_LOG_LEVEL,
   allowedOrigins: parseOrigins(process.env['CORS_ORIGINS']),

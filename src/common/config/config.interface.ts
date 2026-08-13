@@ -22,6 +22,7 @@ import { NodeEnvEnum } from '@common/enums';
 export interface IAppConfig {
   nodeEnv: NodeEnvEnum;
   port: number;
+  publicUrl: string | null;
   version: string;
   logLevel: string;
   allowedOrigins: string[];

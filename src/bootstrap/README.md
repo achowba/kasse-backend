@@ -11,6 +11,24 @@ Splits startup into two steps so each is testable and readable on its own:
 
 `setupSwagger` mounts the dark themed docs at `/docs`, with a case insensitive filter plugin, and serves the OpenAPI document at `/docs-json`.
 
+## The boot line names an address it can actually reach
+
+`main.ts` logs where the service is listening, because "Nest application successfully started" does not say where and a reader should not have to guess at a port they may have overridden.
+
+It used to build that address as `http://localhost:${port}` unconditionally. On a developer's machine that is right. In a container it announced a URL that resolves to the container itself, which nobody can reach and which is not where the service answers. **Naming the wrong address is worse than naming none**, because it is the first thing somebody copies when a deployment looks wrong.
+
+A process behind a proxy cannot discover its own public address: the proxy terminates TLS and rewrites the host. So it has to be told, through `PUBLIC_URL`. Reading a platform's own variable instead would tie this service to one host.
+
+`resolveBaseUrl` decides, in order:
+
+| Condition | Result |
+|---|---|
+| `PUBLIC_URL` is set | That, with any trailing slash removed |
+| Development or test | `http://localhost:PORT`, which is true there |
+| Anything else | `null` |
+
+On `null` the caller logs the port and the paths on their own, which are true everywhere. The port is always accurate, so it carries the message when the host cannot.
+
 ## How it relates to the rest of the project
 
 `main.ts` calls these in order and then listens. Nothing else imports this folder.

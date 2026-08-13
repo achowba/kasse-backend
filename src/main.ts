@@ -4,7 +4,7 @@ import { Logger } from 'nestjs-pino';
 import { IAppConfig } from '@common/config';
 import { API_PREFIX, BOOTSTRAP_CONTEXT } from '@common/constants';
 import { ApiVersionEnum, NodeEnvEnum } from '@common/enums';
-import { bootstrapNestServer, initialiseNestApplication } from './bootstrap';
+import { bootstrapNestServer, initialiseNestApplication, resolveBaseUrl } from './bootstrap';
 
 /**
  * Boots the HTTP application and starts listening.
@@ -36,20 +36,37 @@ const bootstrap = async (): Promise<void> => {
   // Nest's own Logger, which routes through the pino logger installed above,
   // so this line is formatted and redacted like every other.
   const logger = new NestLogger(BOOTSTRAP_CONTEXT);
-  const baseUrl = `http://localhost:${config.port}`;
+
+  // Null when the public address is not knowable, which is every deployed
+  // environment that has not been told one. This used to say `localhost`
+  // regardless, so a container announced an address that resolves to itself and
+  // that nobody can reach. Naming the wrong address is worse than naming none,
+  // because it is the first thing somebody copies when a deployment looks wrong.
+  const baseUrl = resolveBaseUrl(config);
+
+  // Nest prefixes a URI version with `v`, and the enum holds only the number, so
+  // the `v` belongs here rather than in the enum where it would be doubled on
+  // every route.
+  const apiPath = `/${API_PREFIX}/v${ApiVersionEnum.V1}`;
+
+  /**
+   * Qualifies a path with the base URL when there is one.
+   *
+   * @param path - The absolute path to report.
+   * @returns The full URL, or the path alone when no host is known.
+   */
+  const address = (path: string): string => (baseUrl === null ? path : `${baseUrl}${path}`);
 
   logger.log(
     {
       port: config.port,
       environment: config.nodeEnv,
-      // Nest prefixes a URI version with `v`, and the enum holds only the
-      // number, so the `v` belongs here rather than in the enum where it would
-      // end up doubled on every route.
-      api: `${baseUrl}/${API_PREFIX}/v${ApiVersionEnum.V1}`,
-      health: `${baseUrl}/${API_PREFIX}/v${ApiVersionEnum.V1}/health`,
-      ...(config.nodeEnv === NodeEnvEnum.PRODUCTION ? {} : { docs: `${baseUrl}/docs` }),
+      api: address(apiPath),
+      health: address(`${apiPath}/health`),
+      ...(config.nodeEnv === NodeEnvEnum.PRODUCTION ? {} : { docs: address('/docs') }),
     },
-    `listening on ${baseUrl}`,
+    // The port is always true, so it carries the message when the host cannot.
+    baseUrl === null ? `listening on port ${config.port}` : `listening on ${baseUrl}`,
   );
 };
 
