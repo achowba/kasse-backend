@@ -1037,6 +1037,314 @@
         ]
       }
     },
+    "/api/v1/plans": {
+      "get": {
+        "description": "Returns monthly targets, newest month first, optionally filtered by month range and category.\n\nEach row carries the category id rather than its name. Resolving names here would mean a lookup per row, and a client listing targets already holds the category list it built its picker from. The report endpoint does include names, because there the join happens once inside the aggregation.",
+        "operationId": "PlansController_list_v1",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "How many records to return.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "description": "How many records to skip.",
+            "schema": {
+              "minimum": 0,
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "First month of the range, inclusive.",
+            "schema": {
+              "example": "2026-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Last month of the range, inclusive.",
+            "schema": {
+              "example": "2026-12",
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "Restrict to one category.",
+            "schema": {
+              "example": "65f1c2d3e4b5a6c7d8e9f0a1",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of targets.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlanResponseDTO"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List targets",
+        "tags": [
+          "Plans"
+        ]
+      },
+      "put": {
+        "description": "Sets the target for one category and one month, creating it or replacing it.\n\nAddressed by category and month rather than by id, because that is how a target is thought about: a cell in a grid. Sending the same request twice updates the cell rather than creating a second target, so a client never has to know whether one already existed. A unique index enforces that, so two requests racing on the same cell also produce one record.\n\nA target of `0` is meaningful and is not the same as having no target. Zero means nothing was planned, so spend against it is reported as unplanned with a `null` variance percentage rather than an infinite one. No target at all means the cell is absent from the plan side of the report entirely.\n\nRejected with `423` when the month is closed, and with `404` when the category is not one the caller can use.",
+        "operationId": "PlansController_upsert_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertPlanDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The stored target.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The category is not one the caller can use.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The month is closed. The response carries the month in `details`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set a target",
+        "tags": [
+          "Plans"
+        ]
+      }
+    },
+    "/api/v1/plans/{planId}": {
+      "patch": {
+        "description": "Changes the amount of an existing target.\n\nOnly the amount. Moving a target to a different category or month is not an edit but a different cell: it would vacate one cell and overwrite another, and either end could be in a closed period. Set the new cell and delete the old one, so each goes through its own lock check.\n\nRejected with `423` when the target's month is closed.",
+        "operationId": "PlansController_update_v1",
+        "parameters": [
+          {
+            "name": "planId",
+            "required": true,
+            "in": "path",
+            "description": "Identifier from the plan list.",
+            "schema": {
+              "example": "65f1c2d3e4b5a6c7d8e9f0b1",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ObjectId"
+                }
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePlanDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated target.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The caller has no target with that id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The month is closed. The response carries the month in `details`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a target amount",
+        "tags": [
+          "Plans"
+        ]
+      },
+      "delete": {
+        "description": "Removes a target, so the category and month no longer appear on the plan side of a report.\n\nThe delete is soft. The audit trail keeps what the target was, so a report run before the deletion can still be explained, and the cell can be planned again afterwards.\n\nRejected with `423` when the target's month is closed.",
+        "operationId": "PlansController_remove_v1",
+        "parameters": [
+          {
+            "name": "planId",
+            "required": true,
+            "in": "path",
+            "description": "Identifier from the plan list.",
+            "schema": {
+              "example": "65f1c2d3e4b5a6c7d8e9f0b1",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ObjectId"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The target was removed."
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The caller has no target with that id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The month is closed. The response carries the month in `details`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a target",
+        "tags": [
+          "Plans"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "description": "Answers whether the process is running. Checks no dependency.",
@@ -1845,6 +2153,78 @@
             "example": "2026-Q1"
           }
         }
+      },
+      "PlanResponseDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identifier of the target.",
+            "example": "65f1c2d3e4b5a6c7d8e9f0b1"
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "The category this target is for.",
+            "example": "65f1c2d3e4b5a6c7d8e9f0a1"
+          },
+          "month": {
+            "type": "string",
+            "description": "The month it applies to.",
+            "example": "2026-01"
+          },
+          "targetMinor": {
+            "type": "number",
+            "description": "The target in minor units. 5,000.00 is 500000.",
+            "example": 500000
+          }
+        },
+        "required": [
+          "id",
+          "categoryId",
+          "month",
+          "targetMinor"
+        ]
+      },
+      "UpsertPlanDTO": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "The category this target is for.",
+            "example": "65f1c2d3e4b5a6c7d8e9f0a1"
+          },
+          "month": {
+            "type": "string",
+            "description": "The month the target applies to.",
+            "example": "2026-01",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+          },
+          "targetMinor": {
+            "type": "number",
+            "description": "The target in minor units. 5,000.00 is 500000. Zero is a meaningful target: it means nothing was planned, and any spend against it is reported as unplanned rather than as a percentage.",
+            "example": 500000,
+            "minimum": 0
+          }
+        },
+        "required": [
+          "categoryId",
+          "month",
+          "targetMinor"
+        ]
+      },
+      "UpdatePlanDTO": {
+        "type": "object",
+        "properties": {
+          "targetMinor": {
+            "type": "number",
+            "description": "The new target in minor units. 5,000.00 is 500000.",
+            "example": 600000,
+            "minimum": 0
+          }
+        },
+        "required": [
+          "targetMinor"
+        ]
       }
     }
   }
