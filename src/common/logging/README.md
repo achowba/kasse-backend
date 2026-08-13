@@ -12,6 +12,26 @@ Builds the pino options used by `LoggerModule`. Three behaviours matter:
 
 Output is one JSON object per line. Pretty printing is development only.
 
+## The request body is logged, scrubbed
+
+`pino-http` logs no request body. It emits the method, URL, query, route params, headers, and peer address, so a payload was invisible and the `req.body.*` entries in `REDACTED_PATHS` matched nothing at all. A 401 could not be told from a wrong password without guessing.
+
+`buildRequestProps` adds it as `requestBody`, with every credential replaced. A request carrying no body adds nothing, so a `GET` line is unchanged.
+
+It is wired as `customProps` rather than as a `req` serialiser, and that is forced rather than chosen. **pino serialises a child logger's bindings when the child is created**, which `pino-http` does on entering the middleware. The body parser has not run at that point, so a `req` serialiser sees no body however it is written. `customProps` is evaluated when the line is written, on response finish, which is the only point at which the body exists.
+
+Every body is logged, in every environment. That is a deliberate trade for debuggability, and it has a cost worth restating: bodies here are small and bounded by their DTOs, but an endpoint accepting a large payload would want a size guard, and a body can carry personal data that a retention policy then has to account for.
+
+## One request, one line
+
+The request logger is registered twice over, and only one of those registrations may build a `pino-http` instance.
+
+Nest applies the global prefix to a middleware path, so `LoggerModule`'s own registration only ever covered `/api`. Requests to `/`, `/favicon.ico`, `/docs`, and every typo reached the exception filter with no request line and an empty request id, so a 404 was both invisible and unattributable. `bootstrapNestServer` therefore registers `pino-http` at the Express level, before routing.
+
+`LoggerModule` is then configured with `useExisting`, which leaves it contributing only the middleware that binds the request logger into async local storage. That binding is not optional: it is what gives a line written inside a handler the same request id as the request line.
+
+Without `useExisting` both instances log every `/api` request, because **`pino-http` sets no marker for a request it has already handled**. The two lines are near identical, and the only tell is that the second has been through routing and so carries `params`.
+
 ## Redaction happens twice, on purpose
 
 Two mechanisms, and neither replaces the other.
@@ -19,6 +39,8 @@ Two mechanisms, and neither replaces the other.
 **pino's `redact` paths** handle the request and response, whose shape is known: `req.headers.authorization`, `res.headers["set-cookie"]`, and the credential fields of a request body. Exact and cheap.
 
 **A recursive walk** in `logger.format.ts`, wired as pino's `formatters.log`, handles everything else. It replaces the value of any key in `REDACTED_LOG_KEYS` wherever it appears, at any depth, matching case insensitively.
+
+The body goes through the walk before it ever reaches the entry, in `buildRequestProps`. `formatters.log` would reach it anyway, since it sits at the top level of the entry as a plain object, but scrubbing it where it is introduced keeps the guarantee inside the function that creates the risk rather than resting on a walk configured elsewhere.
 
 ### Why the second one had to exist
 

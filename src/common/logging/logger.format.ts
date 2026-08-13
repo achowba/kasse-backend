@@ -1,8 +1,10 @@
+import type { IncomingMessage } from 'node:http';
 import {
   CIRCULAR_PLACEHOLDER,
   REDACTED_LOG_KEYS,
   REDACTED_PLACEHOLDER,
   REDACTION_MAX_DEPTH,
+  REQUEST_LOG_CONTEXT,
   RESERVED_ENTRY_KEYS,
   TRUNCATED_PLACEHOLDER,
 } from './logging.constants';
@@ -105,4 +107,44 @@ export const redactEntry = (entry: Record<string, unknown>): Record<string, unkn
   }
 
   return result;
+};
+
+/**
+ * Builds the fields stamped on a request line, including the scrubbed body.
+ *
+ * @remarks
+ * `pino-http` logs no request body. Its standard serialiser emits the method,
+ * URL, query, route params, headers, and peer address, so a payload was never a
+ * candidate for a log line and the `req.body.*` entries in `REDACTED_PATHS`
+ * matched nothing.
+ *
+ * This is `customProps` rather than a `req` serialiser, and the difference is
+ * not cosmetic. `pino` serialises a child logger's bindings **eagerly**, at the
+ * moment the child is created, which `pino-http` does when the middleware is
+ * entered. The body parser has not run at that point, so a `req` serialiser sees
+ * no body however it is written. `customProps` is called when the line is
+ * actually written, on response finish, by which time the parser has populated
+ * it. A bodyless request contributes nothing, so a `GET` line is unchanged.
+ *
+ * The body is scrubbed by key at any depth rather than by path. `redactEntry`
+ * would reach it anyway, since it is a plain object at the top level of the
+ * entry, but doing it here keeps the guarantee inside the function that
+ * introduces the risk instead of resting on a walk configured elsewhere.
+ *
+ * @steps
+ * 1. Read the parsed body, when the parser has produced one.
+ * 2. Stamp the request context, so these lines filter with the rest.
+ * 3. Add the body, scrubbed, when there is one.
+ *
+ * @param request - The incoming request, after body parsing.
+ * @returns The extra fields for this request's log line.
+ */
+export const buildRequestProps = (request: IncomingMessage): Record<string, unknown> => {
+  const body: unknown = 'body' in request ? request.body : undefined;
+
+  if (body === undefined) {
+    return { context: REQUEST_LOG_CONTEXT };
+  }
+
+  return { context: REQUEST_LOG_CONTEXT, requestBody: redactValue(body, 0, new WeakSet<object>()) };
 };

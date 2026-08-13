@@ -1,6 +1,14 @@
+import { IncomingMessage } from 'node:http';
+import { Socket } from 'node:net';
 import { Types } from 'mongoose';
-import { redactEntry, redactValue } from './logger.format';
-import { CIRCULAR_PLACEHOLDER, REDACTED_PLACEHOLDER, REDACTION_MAX_DEPTH, TRUNCATED_PLACEHOLDER } from './logging.constants';
+import { buildRequestProps, redactEntry, redactValue } from './logger.format';
+import {
+  CIRCULAR_PLACEHOLDER,
+  REDACTED_PLACEHOLDER,
+  REDACTION_MAX_DEPTH,
+  REQUEST_LOG_CONTEXT,
+  TRUNCATED_PLACEHOLDER,
+} from './logging.constants';
 
 /**
  * Scrubs a value with a fresh path set.
@@ -167,5 +175,76 @@ describe('redactEntry', () => {
     context['self'] = context;
 
     expect(() => JSON.stringify(redactEntry({ msg: 'odd', context }))).not.toThrow();
+  });
+});
+
+describe('buildRequestProps', () => {
+  /**
+   * Builds the props for a request carrying the given parsed body.
+   *
+   * @param body - The body the parser would have produced, if any.
+   * @returns The extra fields stamped on that request's log line.
+   */
+  const propsFor = (body?: unknown): Record<string, unknown> => {
+    const request: IncomingMessage & { body?: unknown } = new IncomingMessage(new Socket());
+
+    request.method = 'POST';
+    request.url = '/api/v1/auth/login';
+
+    if (body !== undefined) {
+      request.body = body;
+    }
+
+    return buildRequestProps(request);
+  };
+
+  it('includes the parsed body, which pino-http does not log at all', () => {
+    expect(propsFor({ email: 'demo@kasse.app' })['requestBody']).toEqual({ email: 'demo@kasse.app' });
+  });
+
+  it('redacts a password while leaving the address readable', () => {
+    // Both halves matter. A line that hides the address cannot answer which
+    // account was refused, which is the question a 401 raises.
+    expect(propsFor({ email: 'demo@kasse.app', password: 'demo-account-password' })['requestBody']).toEqual({
+      email: 'demo@kasse.app',
+      password: REDACTED_PLACEHOLDER,
+    });
+  });
+
+  it('redacts a secret nested deeper in the body than any path pattern anticipated', () => {
+    // `req.body.password` reaches exactly one level. This is the case that
+    // survives it, and the reason the body is scrubbed by key rather than path.
+    expect(propsFor({ payload: { credentials: { refreshToken: 'rt_real' } } })['requestBody']).toEqual({
+      payload: { credentials: { refreshToken: REDACTED_PLACEHOLDER } },
+    });
+  });
+
+  it('redacts every credential a signup or a rotation carries', () => {
+    expect(propsFor({ password: 'p', token: 't', refreshToken: 'r', accessToken: 'a' })['requestBody']).toEqual({
+      password: REDACTED_PLACEHOLDER,
+      token: REDACTED_PLACEHOLDER,
+      refreshToken: REDACTED_PLACEHOLDER,
+      accessToken: REDACTED_PLACEHOLDER,
+    });
+  });
+
+  it('stamps the request context whether or not there is a body', () => {
+    // Without it these lines lose the context the framework's own lines carry,
+    // and a reader filtering by context loses exactly the requests.
+    expect(propsFor()['context']).toBe(REQUEST_LOG_CONTEXT);
+    expect(propsFor({ email: 'demo@kasse.app' })['context']).toBe(REQUEST_LOG_CONTEXT);
+  });
+
+  it('adds nothing when the parser produced no body, so a GET line is unchanged', () => {
+    expect(propsFor()).not.toHaveProperty('requestBody');
+  });
+
+  it('survives a body that cycles back on itself', () => {
+    const body: Record<string, unknown> = { email: 'demo@kasse.app' };
+
+    body['self'] = body;
+
+    // A log line must never be the thing that breaks a request.
+    expect(() => JSON.stringify(propsFor(body))).not.toThrow();
   });
 });
