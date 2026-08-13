@@ -34,4 +34,5 @@ export const appConfig = registerAs('app', (): IAppConfig => ({
   allowedOrigins: parseOrigins(process.env['CORS_ORIGINS']),
   throttleTtlMs: Number(process.env['THROTTLE_TTL_MS'] ?? DEFAULT_THROTTLE_TTL_MS),
   throttleLimit: Number(process.env['THROTTLE_LIMIT'] ?? DEFAULT_THROTTLE_LIMIT),
+  anthropicApiKey: process.env['ANTHROPIC_API_KEY'] ?? null,
 }));

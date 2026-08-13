@@ -18,6 +18,7 @@
  * @property PERIOD_LOCKED - A month was locked.
  * @property PERIOD_UNLOCKED - A month was unlocked.
  * @property IMPORT_COMPLETED - A CSV import committed.
+ * @property NL_QUERY_RUN - A question was turned into a report filter and run.
  */
 export enum AuditActionEnum {
   CATEGORY_CREATED = 'CATEGORY_CREATED',
@@ -32,6 +33,7 @@ export enum AuditActionEnum {
   PERIOD_LOCKED = 'PERIOD_LOCKED',
   PERIOD_UNLOCKED = 'PERIOD_UNLOCKED',
   IMPORT_COMPLETED = 'IMPORT_COMPLETED',
+  NL_QUERY_RUN = 'NL_QUERY_RUN',
 }
 
 /**
@@ -42,6 +44,7 @@ export enum AuditActionEnum {
  * @property EXPENSE - A logged expense.
  * @property PERIOD_LOCK - A locked month.
  * @property IMPORT_BATCH - A CSV import.
+ * @property REPORT - A report that was read rather than a record that was changed.
  */
 export enum AuditEntityEnum {
   CATEGORY = 'CATEGORY',
@@ -49,4 +52,5 @@ export enum AuditEntityEnum {
   EXPENSE = 'EXPENSE',
   PERIOD_LOCK = 'PERIOD_LOCK',
   IMPORT_BATCH = 'IMPORT_BATCH',
+  REPORT = 'REPORT',
 }

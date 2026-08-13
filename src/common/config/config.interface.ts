@@ -16,6 +16,7 @@ import { NodeEnvEnum } from '@common/enums';
  * @property logLevel - Minimum severity written to the log.
  * @property allowedOrigins - Browser origins allowed by CORS. Empty means none.
  * @property throttleTtlMs - Rate limit window for ordinary routes, in milliseconds.
+ * @property anthropicApiKey - Key for the natural language endpoint, or null when it is not configured.
  * @property throttleLimit - Requests allowed per window per caller on ordinary routes.
  */
 export interface IAppConfig {
@@ -26,6 +27,7 @@ export interface IAppConfig {
   allowedOrigins: string[];
   throttleTtlMs: number;
   throttleLimit: number;
+  anthropicApiKey: string | null;
 }
 
 /**
