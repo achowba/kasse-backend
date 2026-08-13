@@ -5,7 +5,8 @@ import { Params } from 'nestjs-pino';
 import type { Level } from 'pino';
 import { IAppConfig } from '@common/config';
 import { NodeEnvEnum } from '@common/enums';
-import { REDACTED_PATHS, UNLOGGED_PATHS } from './logging.constants';
+import { redactEntry } from './logger.format';
+import { REDACTED_PATHS, REDACTED_PLACEHOLDER, UNLOGGED_PATHS } from './logging.constants';
 
 /**
  * Reports whether the pretty printing transport is installed.
@@ -68,7 +69,15 @@ export const buildLoggerOptions = (appConfig: IAppConfig): Params => ({
       return requestId;
     },
 
-    redact: { paths: REDACTED_PATHS, censor: '[redacted]' },
+    // Two mechanisms, and neither replaces the other. `redact` is exact and cheap
+    // on the known request and response shape. `formatters.log` runs the
+    // recursive walk over everything else, which is where a secret nested deeper
+    // than a path pattern anticipated would otherwise survive.
+    redact: { paths: REDACTED_PATHS, censor: REDACTED_PLACEHOLDER },
+
+    formatters: {
+      log: redactEntry,
+    },
 
     autoLogging: {
       ignore: (req: IncomingMessage): boolean => UNLOGGED_PATHS.includes(req.url ?? ''),
