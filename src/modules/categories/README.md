@@ -30,6 +30,16 @@ That was allowed, and it produced exactly the failure the slug exists to prevent
 
 So the check in the service is scoped to everything the caller can see, through `slugIsVisible`, rather than to what they own. The constraint that matters here is one the database cannot express, which is the reason it is written down in a service and tested.
 
+### The key is built on `@common/text`
+
+The slug used to collapse everything outside `a-z0-9` to a hyphen, which broke in two directions.
+
+An invisible character became a **separator instead of disappearing**, so `Marke<ZWSP>ting` keyed as `marke-ting`, sat in the picker next to `Marketing` looking identical, and split its spend across two rows of the variance report. Every uniqueness rule here was bypassable by pasting one character nobody can see.
+
+A non ASCII letter was **deleted**, so `Café` keyed as `caf`. `Café` and `Cafè` therefore collided while `Café` and `Cafe` did not, and the same name keyed differently depending on whether the machine produced a composed or a decomposed accent. A name written in a non Latin script reduced to an empty string and was refused for having no letters in it.
+
+`foldForComparison` handles both, and the separator now spans every script. See [common/text](../../common/text/README.md).
+
 ## Archive and delete are different things
 
 Archiving hides a category from pickers and changes nothing else: existing plans and expenses still resolve it, and reports are unaffected. It is almost always what someone wants.

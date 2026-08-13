@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsInt, IsMongoId, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { MONTH_PATTERN } from '@common/month';
+import { SanitisedText } from '@common/text';
 import { MAX_AMOUNT_MINOR, MIN_AMOUNT_MINOR, NOTE_MAX_LENGTH } from '../expenses.constants';
 
 /**
@@ -36,6 +37,7 @@ export class CreateExpenseDTO {
   amountMinor!: number;
 
   @ApiPropertyOptional({ description: 'Optional free text.', example: 'Annual renewal', maxLength: NOTE_MAX_LENGTH })
+  @SanitisedText()
   @IsOptional()
   @IsString()
   @MaxLength(NOTE_MAX_LENGTH)
