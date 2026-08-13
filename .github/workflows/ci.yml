@@ -7,7 +7,7 @@ on:
 
 jobs:
   verify:
-    name: Format, lint, typecheck, test, build
+    name: Format, lint, cycles, typecheck, test, build
     runs-on: ubuntu-latest
 
     steps:
@@ -23,6 +23,10 @@ jobs:
       - run: npm run format:check
 
       - run: npm run lint
+
+      # A cycle between modules compiles and passes tests, then fails at runtime
+      # as an undefined injected dependency. It has to be caught by a tool.
+      - run: npm run lint:circular
 
       - run: npm run typecheck
 
