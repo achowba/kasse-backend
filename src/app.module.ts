@@ -8,6 +8,7 @@ import { DatabaseModule } from '@common/database';
 import { buildLoggerOptions } from '@common/logging';
 import { AuditLogModule } from '@modules/audit-log';
 import { AuthModule } from '@modules/auth';
+import { CategoriesModule } from '@modules/categories';
 import { HealthModule } from '@modules/health';
 import { UsersModule } from '@modules/users';
 
@@ -45,6 +46,7 @@ import { UsersModule } from '@modules/users';
     AuthModule,
     UsersModule,
     AuditLogModule,
+    CategoriesModule,
     HealthModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
