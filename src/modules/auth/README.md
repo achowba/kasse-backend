@@ -16,6 +16,16 @@ The private key signs and never leaves this service. The public key only verifie
 
 Both keys are supplied base64 encoded, because a PEM contains newlines and an environment variable is one line. They are decoded and inspected at boot: a value that does not decode to a PEM of the right kind fails the boot rather than surfacing as an unhelpful signing error at the first login.
 
+## What the access token carries
+
+```json
+{ "sub": "6a7db77ccd1b0d7a2c20b673", "email": "demo@kasse.app", "iat": ..., "exp": ..., "iss": "..." }
+```
+
+`sub` is the account, and it is the only claim anything is decided from. Every query is scoped by it.
+
+`email` is there for **attribution, not authorisation**. It lets a log line name the account without a database read on every request, which is the cost stateless verification exists to avoid. Nothing reads it to make a decision, and a token issued before an address changed would carry the old one until it expires, which is minutes. A token predating the claim has no `email` at all and stays valid until it expires, so anything reading it must tolerate its absence.
+
 ## Rotation and reuse detection
 
 Every refresh rotates. The presented token is revoked and a new one is issued in the same family, so a refresh token works exactly once. The revoke and the issue run in one transaction, so a failure between them cannot leave a session with no usable refresh token.

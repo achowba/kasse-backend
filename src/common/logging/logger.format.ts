@@ -1,4 +1,6 @@
 import type { IncomingMessage } from 'node:http';
+import { Types } from 'mongoose';
+import { logUser } from './log-context';
 import {
   CIRCULAR_PLACEHOLDER,
   REDACTED_LOG_KEYS,
@@ -141,10 +143,70 @@ export const redactEntry = (entry: Record<string, unknown>): Record<string, unkn
  */
 export const buildRequestProps = (request: IncomingMessage): Record<string, unknown> => {
   const body: unknown = 'body' in request ? request.body : undefined;
+  const user = readAuthenticatedUser(request);
 
-  if (body === undefined) {
-    return { context: REQUEST_LOG_CONTEXT };
+  return {
+    context: REQUEST_LOG_CONTEXT,
+    ...(user === null ? {} : logUser(user.id, user.email)),
+    ...(body === undefined ? {} : { requestBody: redactValue(body, 0, new WeakSet<object>()) }),
+  };
+};
+
+/**
+ * Reads the authenticated account's id off a request, when there is one.
+ *
+ * @remarks
+ * Structural rather than typed against `IAuthenticatedUser`, deliberately. This
+ * module is a leaf that everything logging depends on, and importing the auth
+ * types to read one field would give it a dependency on a feature module for the
+ * sake of a property name.
+ *
+ * The guard populates this after the middleware has run, which is why it is read
+ * here in `customProps` at write time rather than captured on entry. An
+ * unauthenticated request, a public route, or a rejected token all leave it
+ * absent, so those lines simply carry no user and are still logged.
+ *
+ * @param request - The incoming request, after the guard.
+ * @returns The account id as a string, or null when nobody is authenticated.
+ */
+const readAuthenticatedUser = (request: IncomingMessage): { id: string; email?: string } | null => {
+  if (!('user' in request)) {
+    return null;
   }
 
-  return { context: REQUEST_LOG_CONTEXT, requestBody: redactValue(body, 0, new WeakSet<object>()) };
+  const user: unknown = request.user;
+
+  if (typeof user !== 'object' || user === null || !('userId' in user)) {
+    return null;
+  }
+
+  const id = readIdentifier(user.userId);
+
+  if (id === null) {
+    return null;
+  }
+
+  const email = 'email' in user && typeof user.email === 'string' ? user.email : undefined;
+
+  return { id, email };
+};
+
+/**
+ * Turns whatever is on the request into an identifier, or refuses to.
+ *
+ * @remarks
+ * Narrowed to the two types this is ever set to rather than stringified
+ * loosely. Anything else reaching `String()` logs `[object Object]`, which is
+ * worse than logging nothing: it looks like an identifier, it groups every
+ * account under one value, and it would be believed.
+ *
+ * @param value - The `userId` found on the request.
+ * @returns The identifier as a string, or null when it is not one.
+ */
+const readIdentifier = (value: unknown): string | null => {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return value instanceof Types.ObjectId ? value.toHexString() : null;
 };
