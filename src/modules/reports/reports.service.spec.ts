@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { DataVersionService } from '@common/cache';
-import { MissingActualPolicyEnum } from '@common/money';
+import { calculateVariance, MissingActualPolicyEnum } from '@common/money';
 import { UsersService } from '@modules/users';
 import { ReportQueryDTO } from './dto/report-query.dto';
 import { SeriesGroupByEnum } from './reports.enums';
@@ -11,17 +11,43 @@ import { ReportsService } from './reports.service';
 const marketing = new Types.ObjectId();
 const payroll = new Types.ObjectId();
 
-/** Stand in for one aggregated cell. */
-const buildCell = (overrides: Partial<IReportCell> = {}): IReportCell => ({
-  categoryId: marketing,
-  categoryName: 'Marketing',
-  month: '2026-01',
-  planMinor: 500_000,
-  actualMinor: 480_000,
-  hasPlan: true,
-  hasActual: true,
-  ...overrides,
-});
+/**
+ * Stand in for one aggregated cell.
+ *
+ * @remarks
+ * Variance arrives already computed now that the pipeline does the arithmetic,
+ * so a fixture has to carry it. It is derived here through `calculateVariance`
+ * rather than hand written, which keeps every fixture self consistent and means
+ * a fixture cannot assert a number the real rules would never produce.
+ *
+ * These tests no longer cover the arithmetic itself. `variance.spec.ts` covers
+ * the rules, and `report-variance-parity.e2e-spec.ts` asserts the pipeline agrees
+ * with them against a real database, which is the only place that can be checked.
+ *
+ * @param overrides - Fields to change.
+ * @returns The cell.
+ */
+const buildCell = (overrides: Partial<IReportCell> = {}): IReportCell => {
+  const base = {
+    categoryId: marketing,
+    categoryName: 'Marketing',
+    month: '2026-01',
+    planMinor: 500_000,
+    actualMinor: 480_000 as number | null,
+    hasPlan: true,
+    hasActual: true,
+    ...overrides,
+  };
+  const computed = calculateVariance(base.planMinor, base.actualMinor ?? 0, MissingActualPolicyEnum.ZERO);
+
+  return {
+    ...base,
+    actualMinor: computed.actualMinor,
+    varianceMinor: computed.varianceMinor,
+    variancePercent: computed.variancePercent,
+    ...overrides,
+  };
+};
 
 /**
  * The published sample data, as the aggregation would return it.
@@ -116,26 +142,18 @@ describe('ReportsService', () => {
       ]);
     });
 
-    it('reports the month with nothing logged as a dash under the null policy', async () => {
-      const report = await service.planVsActual(userId, query({ missingActuals: MissingActualPolicyEnum.NULL }));
+    it('hands the requested policy to the aggregation, which is what applies it', async () => {
+      await service.planVsActual(userId, query({ missingActuals: MissingActualPolicyEnum.NULL }));
 
-      expect(report.items[2]).toEqual(
-        expect.objectContaining({
-          month: '2026-02',
-          categoryName: 'Marketing',
-          planMinor: 500_000,
-          actualMinor: null,
-          varianceMinor: null,
-          variancePercent: null,
-          hasActual: false,
-        }),
-      );
+      // The policy changes the arithmetic, and the arithmetic now happens in the
+      // pipeline. What this layer still owns is passing it through unchanged.
+      expect(repository.aggregate).toHaveBeenCalledWith(userId, '2026-01', '2026-02', [], 50, 0, MissingActualPolicyEnum.NULL);
     });
 
-    it('leaves the months that were logged untouched by the policy', async () => {
-      const report = await service.planVsActual(userId, query({ missingActuals: MissingActualPolicyEnum.NULL }));
+    it('defaults to the zero policy when none is asked for', async () => {
+      await service.planVsActual(userId, query());
 
-      expect(report.items[0]).toEqual(expect.objectContaining({ actualMinor: 480_000, variancePercent: -4 }));
+      expect(repository.aggregate).toHaveBeenCalledWith(userId, '2026-01', '2026-02', [], 50, 0, MissingActualPolicyEnum.ZERO);
     });
   });
 
@@ -156,11 +174,11 @@ describe('ReportsService', () => {
       expect(report.totals.variancePercent).toBeNull();
     });
 
-    it('distinguishes a logged zero from nothing logged', async () => {
+    it('passes the logged-zero flag through without reinterpreting it', async () => {
       repository.aggregate.mockResolvedValue({
         cells: [
           buildCell({ month: '2026-01', actualMinor: 0, hasActual: true }),
-          buildCell({ month: '2026-02', actualMinor: 0, hasActual: false }),
+          buildCell({ month: '2026-02', actualMinor: null, varianceMinor: null, variancePercent: null, hasActual: false }),
         ],
         totals: { planMinor: 1_000_000, actualMinor: 0 },
         total: 2,
@@ -169,10 +187,12 @@ describe('ReportsService', () => {
       const report = await service.planVsActual(userId, query({ missingActuals: MissingActualPolicyEnum.NULL }));
 
       // Both sum to zero. Only the flag separates "we spent nothing and recorded
-      // that" from "nobody has told us yet", and deciding from the sum would
-      // report them identically.
+      // that" from "nobody has told us yet", and this layer must not collapse
+      // one into the other on the way out.
       expect(report.items[0]?.actualMinor).toBe(0);
+      expect(report.items[0]?.hasActual).toBe(true);
       expect(report.items[1]?.actualMinor).toBeNull();
+      expect(report.items[1]?.hasActual).toBe(false);
     });
 
     it('keeps a category that has spend but no plan', async () => {
@@ -224,14 +244,14 @@ describe('ReportsService', () => {
       expect(report.pagination.total).toBe(4);
     });
 
-    it('sums real amounts even when the rows show dashes', async () => {
+    it('stays numeric under the null policy, where a row may show a dash', async () => {
       const report = await service.planVsActual(userId, query({ missingActuals: MissingActualPolicyEnum.NULL }));
 
       // A null in the middle of a column of money is not something a reader can
-      // add up, so the summary stays numeric while the row that has nothing
-      // logged still shows its dash.
+      // add up, so the summary is always computed under the zero policy whatever
+      // the rows are showing.
       expect(report.totals.actualMinor).toBe(4_510_000);
-      expect(report.items[2]?.actualMinor).toBeNull();
+      expect(report.totals.variancePercent).not.toBeNull();
     });
   });
 
@@ -291,7 +311,7 @@ describe('ReportsService', () => {
 
       await service.planVsActual(userId, { fiscalYear: 2026, limit: 50, offset: 0 });
 
-      expect(repository.aggregate).toHaveBeenCalledWith(userId, '2026-01', '2026-12', [], 50, 0);
+      expect(repository.aggregate).toHaveBeenCalledWith(userId, '2026-01', '2026-12', [], 50, 0, MissingActualPolicyEnum.ZERO);
     });
 
     it('resolves an April start to the following March, crossing the calendar year', async () => {
@@ -301,7 +321,7 @@ describe('ReportsService', () => {
 
       // The end month is in 2027. Adding eleven months to April has to roll the
       // year over rather than producing month 15.
-      expect(repository.aggregate).toHaveBeenCalledWith(userId, '2026-04', '2027-03', [], 50, 0);
+      expect(repository.aggregate).toHaveBeenCalledWith(userId, '2026-04', '2027-03', [], 50, 0, MissingActualPolicyEnum.ZERO);
     });
 
     it('resolves a December start to the following November', async () => {
@@ -309,7 +329,7 @@ describe('ReportsService', () => {
 
       await service.planVsActual(userId, { fiscalYear: 2026, limit: 50, offset: 0 });
 
-      expect(repository.aggregate).toHaveBeenCalledWith(userId, '2026-12', '2027-11', [], 50, 0);
+      expect(repository.aggregate).toHaveBeenCalledWith(userId, '2026-12', '2027-11', [], 50, 0, MissingActualPolicyEnum.ZERO);
     });
 
     it('takes precedence over from and to, so a request carrying both has one meaning', async () => {
@@ -317,7 +337,7 @@ describe('ReportsService', () => {
 
       await service.planVsActual(userId, { fiscalYear: 2026, from: '2030-01', to: '2030-06', limit: 50, offset: 0 });
 
-      expect(repository.aggregate).toHaveBeenCalledWith(userId, '2026-01', '2026-12', [], 50, 0);
+      expect(repository.aggregate).toHaveBeenCalledWith(userId, '2026-01', '2026-12', [], 50, 0, MissingActualPolicyEnum.ZERO);
     });
 
     it('keys the cache on the resolved months, so changing the start month needs no invalidation', async () => {

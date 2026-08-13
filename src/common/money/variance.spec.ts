@@ -111,4 +111,24 @@ describe('calculateVariance', () => {
       expect(result.variancePercent).toBe(0);
     });
   });
+
+  describe('negative zero', () => {
+    it('returns a positive zero when a tiny underspend rounds to nothing', () => {
+      const result = calculateVariance(1_000_000, 999_999);
+
+      // -0.0001% rounds to -0 through Math.round. It compares equal to 0 and
+      // serialises as 0, so nothing downstream would have noticed, right up
+      // until something divided by it and got -Infinity.
+      expect(result.variancePercent).toBe(0);
+      expect(Object.is(result.variancePercent, -0)).toBe(false);
+    });
+
+    it('returns a positive zero for a tiny overspend too', () => {
+      expect(Object.is(calculateVariance(1_000_000, 1_000_001).variancePercent, -0)).toBe(false);
+    });
+
+    it('still reports the sign when the variance is large enough to show', () => {
+      expect(calculateVariance(1_000_000, 990_000).variancePercent).toBe(-1);
+    });
+  });
 });
