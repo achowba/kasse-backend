@@ -1,5 +1,17 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min, MinLength, validateSync } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUrl,
+  Max,
+  Min,
+  MinLength,
+  ValidateIf,
+  validateSync,
+} from 'class-validator';
 import { NodeEnvEnum } from '@common/enums';
 import { MINIMUM_ACCESS_TTL_SECONDS, MINIMUM_KEY_LENGTH, PRIVATE_KEY_MARKER, PUBLIC_KEY_MARKER } from './config.constants';
 
@@ -29,6 +41,25 @@ export class EnvironmentVariables {
   @Min(1)
   @Max(65535)
   PORT?: number;
+
+  /*
+   * Where this service answers from the outside, used only to make the boot
+   * line useful. A process cannot discover its own public address: it sits
+   * behind a proxy that rewrites the host, so it has to be told.
+   *
+   * A protocol is required. A bare domain would produce a link nothing can
+   * follow, which is the class of problem this variable exists to fix.
+   *
+   * `ValidateIf` rather than `IsOptional`, because `IsOptional` skips only
+   * `null` and `undefined`. An empty string is a defined value, so the URL
+   * rule ran against it and refused the boot. A deployment platform hands
+   * over a variable left blank in its UI as exactly that, and `.env.example`
+   * ships the key with no value, so copying the example would have made the
+   * service unstartable. Empty means absent here, matching `appConfig`.
+   */
+  @ValidateIf((variables: EnvironmentVariables) => (variables.PUBLIC_URL ?? '') !== '')
+  @IsUrl({ require_tld: false, require_protocol: true })
+  PUBLIC_URL?: string;
 
   @IsOptional()
   @IsString()

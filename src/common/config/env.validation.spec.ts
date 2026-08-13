@@ -92,6 +92,32 @@ describe('validateEnvironment', () => {
     });
   });
 
+  describe('the public URL', () => {
+    it('accepts a deployed address', () => {
+      expect(() => validateEnvironment({ ...VALID_ENV, PUBLIC_URL: 'https://kasse.up.railway.app' })).not.toThrow();
+    });
+
+    it('accepts a local one, which has no top level domain', () => {
+      expect(() => validateEnvironment({ ...VALID_ENV, PUBLIC_URL: 'http://localhost:1413' })).not.toThrow();
+    });
+
+    it('treats an empty value as absent rather than refusing the boot', () => {
+      // `IsOptional` skips only null and undefined, so the URL rule ran against
+      // an empty string and refused to start. A platform hands over a variable
+      // left blank in its UI as exactly that, and `.env.example` ships the key
+      // with no value, so copying the example made the service unstartable.
+      expect(() => validateEnvironment({ ...VALID_ENV, PUBLIC_URL: '' })).not.toThrow();
+    });
+
+    it('rejects a bare domain, which would produce a link nothing can follow', () => {
+      expect(() => validateEnvironment({ ...VALID_ENV, PUBLIC_URL: 'kasse.up.railway.app' })).toThrow(/PUBLIC_URL/);
+    });
+
+    it('rejects something that is not an address at all', () => {
+      expect(() => validateEnvironment({ ...VALID_ENV, PUBLIC_URL: 'not a url' })).toThrow(/PUBLIC_URL/);
+    });
+  });
+
   describe('the limits on the two most expensive routes', () => {
     // These are read straight from `process.env` by `@common/throttling`, because
     // `@Throttle` is a decorator and needs its values before an injector exists.
