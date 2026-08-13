@@ -58,6 +58,11 @@ const globalSetup = async (): Promise<void> => {
   // Base64, matching how a deployment supplies them. A PEM carries newlines, and
   // an environment variable that has to survive a shell, a Docker file, and a
   // platform's secret store is far less trouble as one line.
+  // Required, and the suite brings everything it needs rather than borrowing
+  // from whoever is running it. A local `.env` supplying this would make the
+  // suite pass here and fail in CI.
+  process.env['TOKEN_ISSUER'] = 'kasse-api-test';
+
   process.env['JWT_PRIVATE_KEY'] = Buffer.from(privateKey, 'utf8').toString('base64');
   process.env['JWT_PUBLIC_KEY'] = Buffer.from(publicKey, 'utf8').toString('base64');
 };

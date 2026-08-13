@@ -5,7 +5,6 @@ import { Types } from 'mongoose';
 import { ExtractJwt, Strategy, StrategyOptionsWithoutRequest } from 'passport-jwt';
 import { IAuthenticatedUser } from '@common/auth';
 import { IAuthConfig } from '@common/config';
-import { TOKEN_ISSUER } from '../auth.constants';
 import { IAccessTokenPayload } from '../token.service';
 
 /**
@@ -30,7 +29,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       ignoreExpiration: false,
       secretOrKey: auth.publicKey,
       algorithms: [auth.algorithm],
-      issuer: TOKEN_ISSUER,
+      issuer: auth.issuer,
     };
 
     super(options);

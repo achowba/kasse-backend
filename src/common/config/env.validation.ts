@@ -91,6 +91,19 @@ export class EnvironmentVariables {
   @MinLength(MINIMUM_KEY_LENGTH)
   JWT_PUBLIC_KEY!: string;
 
+  /*
+   * Required. Stamped into every access token and required to match when one
+   * is verified, so signing and verification cannot disagree by accident.
+   *
+   * Required rather than defaulted on purpose. A value that silently falls
+   * back would let one instance sign with the default and another with a
+   * configured value, and the symptom of that is a 401 that reads like an
+   * authentication bug rather than a configuration one.
+   */
+  @IsString()
+  @IsNotEmpty()
+  TOKEN_ISSUER!: string;
+
   @IsOptional()
   @IsInt()
   @Min(MINIMUM_ACCESS_TTL_SECONDS)

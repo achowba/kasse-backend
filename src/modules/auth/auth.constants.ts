@@ -1,12 +1,3 @@
-/**
- * Issuer claim stamped into every access token and required when verifying one.
- *
- * @remarks
- * Signing and verification must agree, so the value lives in one place. It also
- * means a token minted by another service with the same key pair is rejected here.
- */
-export const TOKEN_ISSUER = 'plan-vs-spend-api';
-
 /** Bytes of randomness in a refresh token. 256 bits, so guessing is not a threat model. */
 export const REFRESH_TOKEN_BYTES = 32;
 

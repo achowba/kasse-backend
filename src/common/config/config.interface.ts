@@ -68,6 +68,7 @@ export interface IDatabaseConfig {
 export interface IAuthConfig {
   privateKey: string;
   publicKey: string;
+  issuer: string;
   algorithm: 'RS256';
   accessTtlSeconds: number;
   refreshTtlDays: number;

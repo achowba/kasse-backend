@@ -30,6 +30,9 @@ const decodeKey = (encoded: string | undefined): string =>
  */
 export const authConfig = registerAs('auth', (): IAuthConfig => ({
   privateKey: decodeKey(process.env['JWT_PRIVATE_KEY']),
+  // No default. Validation refuses an absent value at boot, so a fallback
+  // here would only ever mask a variable somebody forgot to set.
+  issuer: process.env['TOKEN_ISSUER'] ?? '',
   publicKey: decodeKey(process.env['JWT_PUBLIC_KEY']),
   algorithm: 'RS256',
   accessTtlSeconds: Number(process.env['JWT_ACCESS_TTL_SECONDS'] ?? DEFAULT_ACCESS_TTL_SECONDS),
