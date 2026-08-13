@@ -107,14 +107,25 @@ export class CategoriesRepository {
   }
 
   /**
-   * Reports whether the caller already has a live category with this key.
+   * Reports whether the caller can already see a live category with this key.
+   *
+   * @remarks
+   * Deliberately scoped to everything visible rather than only what the caller
+   * owns. Checking ownership alone let a personal category take the name of a
+   * shared one, and the two are indistinguishable in a picker. Worse, the report
+   * groups by category id before it resolves a name, so the pair produced two
+   * rows carrying the same label with the spend divided between them, and
+   * neither row showed the real total.
+   *
+   * The unique index cannot catch this. It is keyed on `{ userId, slug }`, and
+   * the two rows differ in `userId`.
    *
    * @param userId - The authenticated caller.
    * @param slug - The normalised name.
-   * @returns True when they already have one.
+   * @returns True when the account or the catalogue already has one.
    */
-  async ownsSlug(userId: Types.ObjectId, slug: string): Promise<boolean> {
-    return (await this.model.exists(this.ownedBy(userId, { slug }))) !== null;
+  async slugIsVisible(userId: Types.ObjectId, slug: string): Promise<boolean> {
+    return (await this.model.exists(this.visibleTo(userId, { slug }))) !== null;
   }
 
   /**

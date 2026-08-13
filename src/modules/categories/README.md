@@ -22,6 +22,14 @@ Without this a picker shows what looks like the same category twice and a varian
 
 The unique index is partial on `deletedAt`, so a deleted name becomes available again. A plain unique index would reserve it forever, since nothing here is hard deleted.
 
+### The index cannot enforce this on its own
+
+It is keyed on `{ userId, slug }`, so it stops an account having two categories called "Advertising" and stops nothing else. A **personal** category taking the name of a **shared** one satisfies it perfectly, because the two rows differ in `userId`.
+
+That was allowed, and it produced exactly the failure the slug exists to prevent. The account saw two identical names in its picker, and because the report groups by category id before it resolves a name, the variance table carried two rows labelled "Advertising" with the spend divided between them and neither showing the real total.
+
+So the check in the service is scoped to everything the caller can see, through `slugIsVisible`, rather than to what they own. The constraint that matters here is one the database cannot express, which is the reason it is written down in a service and tested.
+
 ### The key is built on `@common/text`
 
 The slug used to collapse everything outside `a-z0-9` to a hyphen, which broke in two directions.
@@ -44,7 +52,9 @@ The catalogue is seeded at boot when it is missing, so a fresh database is never
 
 ## How it relates to the rest of the project
 
-Plans and expenses reference a category and check the caller may use it. The CSV import resolves a name from a spreadsheet cell through `resolveByName`, which matches on the slug so capitalisation and spacing in the file do not matter. Where an account has its own category with the same name as a shared one, the account's own wins.
+Plans and expenses reference a category and check the caller may use it. The CSV import resolves a name from a spreadsheet cell through `resolveByName`, which matches on the slug so capitalisation and spacing in the file do not matter.
+
+`findVisibleBySlug` still prefers an account's own category over a shared one of the same name. New data can no longer reach that state, since the name check now covers the catalogue too, but the tie break is kept for rows created before it and because resolving a name to two candidates must never depend on which one the database returned first.
 
 Every change is recorded through `@modules/audit-log`.
 
@@ -57,7 +67,14 @@ Every change is recorded through `@modules/audit-log`.
 | `PATCH` | `/api/v1/categories/:categoryId` | Rename or archive one the caller owns. |
 | `DELETE` | `/api/v1/categories/:categoryId` | Soft delete one the caller owns. |
 
-A shared catalogue entry answers `404` on the mutating routes rather than `403`, because a client already knows from the `shared` flag and there is nothing useful to reveal.
+The mutating routes answer a refusal in one of two ways, and the difference is deliberate.
+
+| Case | Status | Why |
+|---|---|---|
+| A shared catalogue entry | `403` | It is listed to the caller with `shared: true`. Answering "not found" would contradict the list they just read, and leaves a client unable to tell a read only category from a missing one. It is refused and told the rule. |
+| An id belonging to another account | `404` | Confirming it exists would reveal that another account holds it. Answered identically to an id that never existed. |
+
+Both go through one private gate, `resolveOwned`, so no route can answer the question differently from another. The second lookup only runs on the failure path, so the ordinary case still costs a single query.
 
 ## Dependencies on other modules
 
