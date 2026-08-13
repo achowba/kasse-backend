@@ -16,6 +16,8 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
+    "seed:spec": "ts-node -r tsconfig-paths/register src/seed/main.ts spec",
+    "seed:demo": "ts-node -r tsconfig-paths/register src/seed/main.ts demo",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
     "lint:circular": "madge --circular --extensions ts src",
@@ -128,7 +130,8 @@
       "!**/strategies/**",
       "!**/guards/**",
       "!bootstrap/**",
-      "!modules/health/**"
+      "!modules/health/**",
+      "!seed/main.ts"
     ],
     "coverageDirectory": "../coverage",
     "coverageThreshold": {

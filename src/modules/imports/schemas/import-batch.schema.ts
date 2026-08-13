@@ -34,7 +34,11 @@ export interface IImportRowError {
  * @property status - Whether the rows were written.
  * @property rowCount - How many data rows the file carried.
  * @property errorCount - How many were rejected.
- * @property errors - The rejected rows, truncated past a limit.
+ * @property rowErrors - The rejected rows, truncated past a limit. Named this way
+ *   because `errors` is a reserved document property in Mongoose: a field with
+ *   that name shadows the document's own validation errors, which is a collision
+ *   that shows up as a warning now and as a confusing bug later. The API still
+ *   calls it `errors`, since the response DTO does the mapping.
  * @property expenseCount - How many expenses this batch wrote.
  */
 @Schema({ timestamps: true, collection: 'import_batches' })
@@ -55,7 +59,7 @@ export class ImportBatch extends TenantOwnedDocument {
   errorCount!: number;
 
   @Prop({ type: SchemaTypes.Mixed, default: [] })
-  errors!: IImportRowError[];
+  rowErrors!: IImportRowError[];
 
   @Prop({ type: Number, required: true, default: 0 })
   expenseCount!: number;

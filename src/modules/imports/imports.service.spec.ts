@@ -22,7 +22,7 @@ const buildBatch = (overrides: Partial<ImportBatchDocument> = {}): ImportBatchDo
     status: ImportStatusEnum.COMPLETED,
     rowCount: 2,
     errorCount: 0,
-    errors: [],
+    rowErrors: [],
     expenseCount: 2,
     createdAt: new Date('2026-01-15T10:04:11.212Z'),
     ...overrides,
@@ -190,7 +190,7 @@ describe('ImportsService', () => {
       expect(repository.record).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
-          errors: expect.arrayContaining([expect.objectContaining({ line: 3, column: 'category' })]) as unknown[],
+          rowErrors: expect.arrayContaining([expect.objectContaining({ line: 3, column: 'category' })]) as unknown[],
         }),
       );
     });
@@ -206,7 +206,7 @@ describe('ImportsService', () => {
       ).rejects.toBeInstanceOf(AppException);
 
       const recorded = repository.record.mock.calls[0]?.[1];
-      const lines = (recorded?.errors ?? []).map((error) => error.line);
+      const lines = (recorded?.rowErrors ?? []).map((error) => error.line);
 
       // Sorted, because the two kinds of error are found in separate passes and
       // a user reads the list against their file top to bottom.
