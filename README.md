@@ -162,7 +162,7 @@ npm run start:dev
 | Name | Description | Example | Required |
 |---|---|---|---|
 | `NODE_ENV` | Runtime mode. Controls log format and error detail. | `development` | No, defaults to `development` |
-| `PORT` | HTTP port. | `3000` | No, defaults to `3000` |
+| `PORT` | HTTP port. | `1413` | No, defaults to `1413` |
 | `LOG_LEVEL` | Pino log level. | `debug` | No, defaults to `info` |
 | `MONGODB_URI` | Connection string. The server must be a replica set member, because the CSV import writes in a transaction. | `mongodb://localhost:27017/plan_vs_actual?directConnection=true` | Yes |
 | `JWT_ACCESS_SECRET` | Signing secret for access tokens. | Output of `openssl rand -base64 48` | Yes |

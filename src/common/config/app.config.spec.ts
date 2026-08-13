@@ -16,11 +16,11 @@ describe('appConfig', () => {
     process.env = originalEnv;
   });
 
-  it('falls back to development, port 3000, info, and an empty allowlist', () => {
+  it('falls back to development, port 1413, info, and an empty allowlist', () => {
     const config = appConfig();
 
     expect(config.nodeEnv).toBe(NodeEnvEnum.DEVELOPMENT);
-    expect(config.port).toBe(3000);
+    expect(config.port).toBe(1413);
     expect(config.logLevel).toBe('info');
     expect(config.allowedOrigins).toEqual([]);
   });

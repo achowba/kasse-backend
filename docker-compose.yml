@@ -51,8 +51,8 @@ services:
       # as localhost:27017 and that address means nothing inside this container.
       MONGODB_URI: mongodb://mongo:27017/plan_vs_actual?directConnection=true
       # Pinned so the port mapping below stays correct when a workstation .env
-      # moves the app off 3000 to free the port for something else.
-      PORT: 3000
+      # moves the app off 1413 to free the port for something else.
+      PORT: 1413
       # Overrides NODE_ENV from .env, which is development on a workstation. This
       # container runs the production image, which has no dev dependencies, so
       # development mode would try to load a pretty printer that is not there.
@@ -60,7 +60,7 @@ services:
       # the documentation UI.
       NODE_ENV: staging
     ports:
-      - '3000:3000'
+      - '1413:1413'
     depends_on:
       mongo:
         condition: service_healthy
