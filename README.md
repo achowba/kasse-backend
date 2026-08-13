@@ -42,7 +42,7 @@ The API is client agnostic. It speaks JSON over REST, carries sessions in the `A
 | PR template and agent skills | Done |
 | Platform layer: config, logging, errors, docs, health | Done |
 | Persistence: connection, tenant scoped repository, transactions | Done |
-| Core domain: months, money, variance, pagination | Not started |
+| Core domain: months, money, variance, pagination | Done |
 | Auth and sessions | Not started |
 | Audit log | Not started |
 | Categories | Not started |
