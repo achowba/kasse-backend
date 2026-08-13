@@ -8,10 +8,12 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { CurrentUser, type IAuthenticatedUser } from '@common/auth';
 import { ApiVersionEnum } from '@common/enums';
 import { ErrorResponseDTO } from '@common/errors';
+import { EXPENSIVE_THROTTLE_TTL_MS, REPORT_THROTTLE_LIMIT } from '@common/throttling';
 import { ReportQueryDTO } from './dto/report-query.dto';
 import { ReportResponseDTO } from './dto/report-response.dto';
 import { SeriesQueryDTO } from './dto/series-query.dto';
@@ -36,6 +38,7 @@ export class ReportsController {
    * @returns The rows and the totals for the range.
    */
   @Get('plan-vs-actual')
+  @Throttle({ default: { limit: REPORT_THROTTLE_LIMIT, ttl: EXPENSIVE_THROTTLE_TTL_MS } })
   @ApiOperation({
     summary: 'Plan against actual, with variance',
     description: `One row per category and month in the range, with the target, what was spent, and the difference.
@@ -64,6 +67,7 @@ export class ReportsController {
    * @returns The points, in axis order.
    */
   @Get('plan-vs-actual/series')
+  @Throttle({ default: { limit: REPORT_THROTTLE_LIMIT, ttl: EXPENSIVE_THROTTLE_TTL_MS } })
   @ApiOperation({
     summary: 'The same numbers, shaped for a chart',
     description: `Collapses the report onto one axis: \`groupBy=month\` gives a point per month summed across categories, \`groupBy=category\` gives a point per category summed across the range.
@@ -86,6 +90,7 @@ It shares the aggregation with the table rather than reimplementing it, so a cha
    * @param response - The HTTP response, so the file headers can be set.
    */
   @Get('plan-vs-actual/export')
+  @Throttle({ default: { limit: REPORT_THROTTLE_LIMIT, ttl: EXPENSIVE_THROTTLE_TTL_MS } })
   @ApiProduces('text/csv')
   @ApiOperation({
     summary: 'Download the report as CSV',

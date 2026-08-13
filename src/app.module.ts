@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule, ThrottlerModuleOptions } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerModuleOptions } from '@nestjs/throttler';
 import { LoggerModule, Params } from 'nestjs-pino';
 import { CacheModule } from '@common/cache';
 import { appConfig, authConfig, databaseConfig, IAppConfig, validateEnvironment } from '@common/config';
 import { DatabaseModule } from '@common/database';
 import { buildLoggerOptions } from '@common/logging';
+import { UserThrottlerGuard } from '@common/throttling';
 import { AuditLogModule } from '@modules/audit-log';
 import { AuthModule } from '@modules/auth';
 import { CategoriesModule } from '@modules/categories';
@@ -63,6 +64,10 @@ import { UsersModule } from '@modules/users';
     NlQueryModule,
     HealthModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  // Keyed by account once a request is authenticated, by address before that.
+  // An address is both too coarse and too loose for an authenticated API: it
+  // punishes everyone behind one NAT and lets one account spread itself across
+  // several addresses.
+  providers: [{ provide: APP_GUARD, useClass: UserThrottlerGuard }],
 })
 export class AppModule {}

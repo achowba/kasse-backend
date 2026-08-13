@@ -27,6 +27,7 @@ import {
   ApiUnauthorizedResponse,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Types } from 'mongoose';
 import { CurrentUser, type IAuthenticatedUser } from '@common/auth';
 import { ApiVersionEnum } from '@common/enums';
@@ -34,6 +35,7 @@ import { ErrorResponseDTO } from '@common/errors';
 import { IPaginatedResponse, PaginationQueryDTO } from '@common/pagination';
 import { ParseObjectIdPipe } from '@common/pipes';
 import { RequestId } from '@common/request-context';
+import { EXPENSIVE_THROTTLE_TTL_MS, IMPORT_THROTTLE_LIMIT } from '@common/throttling';
 import { LOCKED_RESPONSE } from '@modules/expenses';
 import { ImportBatchResponseDTO } from './dto/import-batch-response.dto';
 import { IDEMPOTENCY_KEY_HEADER, MAX_FILE_BYTES, MAX_ROWS } from './imports.constants';
@@ -60,6 +62,7 @@ export class ImportsController {
    * @returns The batch, whether it succeeded or failed.
    */
   @Post('expenses')
+  @Throttle({ default: { limit: IMPORT_THROTTLE_LIMIT, ttl: EXPENSIVE_THROTTLE_TTL_MS } })
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_FILE_BYTES } }))
   @ApiConsumes('multipart/form-data')
   @ApiHeader({
