@@ -1,9 +1,10 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
-import { IsEnum, IsMongoId, IsOptional, IsString, Matches } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsEnum, IsInt, IsMongoId, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 import { MissingActualPolicyEnum } from '@common/money';
 import { MONTH_PATTERN } from '@common/month';
 import { PaginationQueryDTO } from '@common/pagination';
+import { MAX_FISCAL_YEAR, MIN_FISCAL_YEAR } from '../reports.constants';
 
 /**
  * The range and shape of a report.
@@ -13,21 +14,45 @@ import { PaginationQueryDTO } from '@common/pagination';
  * range is a table scan whose size grows with the account's history, and a client
  * that forgot the range would get one silently.
  *
- * @property from - First month of the range, inclusive.
- * @property to - Last month of the range, inclusive.
+ * @property from - First month of the range, inclusive. Required unless `fiscalYear` is given.
+ * @property to - Last month of the range, inclusive. Required unless `fiscalYear` is given.
+ * @property fiscalYear - A fiscal year, resolved to a range through the account's fiscal year start.
  * @property categoryIds - Restrict to these categories. Every category when absent.
  * @property missingActuals - How to report a category and month with a target but nothing logged.
  */
 export class ReportQueryDTO extends PaginationQueryDTO {
-  @ApiPropertyOptional({ description: 'First month of the range, inclusive.', example: '2026-01' })
+  @ApiPropertyOptional({
+    description: 'First month of the range, inclusive. Required unless `fiscalYear` is given.',
+    example: '2026-01',
+  })
+  @IsOptional()
   @IsString()
   @Matches(MONTH_PATTERN, { message: 'from must be in YYYY-MM format' })
-  from!: string;
+  from?: string;
 
-  @ApiPropertyOptional({ description: 'Last month of the range, inclusive.', example: '2026-02' })
+  @ApiPropertyOptional({
+    description: 'Last month of the range, inclusive. Required unless `fiscalYear` is given.',
+    example: '2026-02',
+  })
+  @IsOptional()
   @IsString()
   @Matches(MONTH_PATTERN, { message: 'to must be in YYYY-MM format' })
-  to!: string;
+  to?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'A fiscal year, resolved to its twelve months through this account’s `fiscalYearStartMonth`. With a start month of 4, `fiscalYear=2026` means 2026-04 through 2027-03. Takes precedence over `from` and `to`.',
+    example: 2026,
+    minimum: 1970,
+    maximum: 2999,
+  })
+  @IsOptional()
+  // Arrives from a query string, so it is a string until something converts it.
+  @Type(() => Number)
+  @IsInt()
+  @Min(MIN_FISCAL_YEAR)
+  @Max(MAX_FISCAL_YEAR)
+  fiscalYear?: number;
 
   @ApiPropertyOptional({
     description: 'Restrict to these categories. Repeat the parameter, or send one comma separated value.',

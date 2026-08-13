@@ -1695,7 +1695,7 @@
             "name": "from",
             "required": false,
             "in": "query",
-            "description": "First month of the range, inclusive.",
+            "description": "First month of the range, inclusive. Required unless `fiscalYear` is given.",
             "schema": {
               "example": "2026-01",
               "type": "string"
@@ -1705,10 +1705,22 @@
             "name": "to",
             "required": false,
             "in": "query",
-            "description": "Last month of the range, inclusive.",
+            "description": "Last month of the range, inclusive. Required unless `fiscalYear` is given.",
             "schema": {
               "example": "2026-02",
               "type": "string"
+            }
+          },
+          {
+            "name": "fiscalYear",
+            "required": false,
+            "in": "query",
+            "description": "A fiscal year, resolved to its twelve months through this account’s `fiscalYearStartMonth`. With a start month of 4, `fiscalYear=2026` means 2026-04 through 2027-03. Takes precedence over `from` and `to`.",
+            "schema": {
+              "minimum": 1970,
+              "maximum": 2999,
+              "example": 2026,
+              "type": "number"
             }
           },
           {
@@ -1793,7 +1805,7 @@
             "name": "from",
             "required": false,
             "in": "query",
-            "description": "First month of the range, inclusive.",
+            "description": "First month of the range, inclusive. Required unless `fiscalYear` is given.",
             "schema": {
               "example": "2026-01",
               "type": "string"
@@ -1803,10 +1815,22 @@
             "name": "to",
             "required": false,
             "in": "query",
-            "description": "Last month of the range, inclusive.",
+            "description": "Last month of the range, inclusive. Required unless `fiscalYear` is given.",
             "schema": {
               "example": "2026-02",
               "type": "string"
+            }
+          },
+          {
+            "name": "fiscalYear",
+            "required": false,
+            "in": "query",
+            "description": "A fiscal year, resolved to its twelve months through this account’s `fiscalYearStartMonth`. With a start month of 4, `fiscalYear=2026` means 2026-04 through 2027-03. Takes precedence over `from` and `to`.",
+            "schema": {
+              "minimum": 1970,
+              "maximum": 2999,
+              "example": 2026,
+              "type": "number"
             }
           },
           {
@@ -1914,7 +1938,7 @@
             "name": "from",
             "required": false,
             "in": "query",
-            "description": "First month of the range, inclusive.",
+            "description": "First month of the range, inclusive. Required unless `fiscalYear` is given.",
             "schema": {
               "example": "2026-01",
               "type": "string"
@@ -1924,10 +1948,22 @@
             "name": "to",
             "required": false,
             "in": "query",
-            "description": "Last month of the range, inclusive.",
+            "description": "Last month of the range, inclusive. Required unless `fiscalYear` is given.",
             "schema": {
               "example": "2026-02",
               "type": "string"
+            }
+          },
+          {
+            "name": "fiscalYear",
+            "required": false,
+            "in": "query",
+            "description": "A fiscal year, resolved to its twelve months through this account’s `fiscalYearStartMonth`. With a start month of 4, `fiscalYear=2026` means 2026-04 through 2027-03. Takes precedence over `from` and `to`.",
+            "schema": {
+              "minimum": 1970,
+              "maximum": 2999,
+              "example": 2026,
+              "type": "number"
             }
           },
           {

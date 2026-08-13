@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ExpensesModule } from '@modules/expenses';
 import { PlansModule } from '@modules/plans';
+import { UsersModule } from '@modules/users';
 import { ReportsController } from './reports.controller';
 import { ReportsRepository } from './reports.repository';
 import { ReportsService } from './reports.service';
@@ -18,7 +19,7 @@ import { ReportsService } from './reports.service';
  * side owns, so no feature module imports another back.
  */
 @Module({
-  imports: [PlansModule, ExpensesModule],
+  imports: [PlansModule, ExpensesModule, UsersModule],
   controllers: [ReportsController],
   providers: [ReportsService, ReportsRepository],
   exports: [ReportsService],

@@ -63,6 +63,18 @@ Per process, deliberately. Each instance holds its own cache and its own counter
 
 `GET /reports/plan-vs-actual/series` collapses the same numbers onto one axis, unpaginated, for charts. It shares the pipeline up to the grouping rather than reimplementing it, so a chart and the table beside it cannot disagree. An e2e test asserts exactly that by summing the series and comparing it to the table's totals.
 
+## Fiscal years
+
+`?fiscalYear=2026` resolves to twelve months through the account's `fiscalYearStartMonth`. With a start month of 4 that is `2026-04` through `2027-03`.
+
+Resolved on the server rather than by the client, because the start month lives on the account and only the server knows it. A client computing the range would have to fetch the setting first and would get it wrong the moment someone changed it.
+
+It takes precedence over `from` and `to`, so a request carrying both has exactly one meaning rather than two.
+
+**The resolved months, not the fiscal year, go into the cache key.** That falls out nicely: changing an account's fiscal year start needs no cache invalidation at all, because the same request simply resolves to a different range and therefore a different key. A test asserts that changing the start month between two identical requests produces two aggregations.
+
+Adding eleven months to a start month has to roll the year over rather than producing month 15, which is why `addMonths` works in absolute month indexes. December start, `fiscalYear=2026`, gives `2026-12` through `2027-11`.
+
 ## The CSV export
 
 `GET /reports/plan-vs-actual/export` renders the same report as a file, with a labelled totals row appended. It calls `planVsActual` rather than reading the database again, so the file and the table on screen cannot disagree, and a download straight after viewing is served from the same cached result.
