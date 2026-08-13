@@ -30,6 +30,11 @@ wider discussion. Say so here rather than leaving it for someone to find. -->
 
 ## Checklist
 
+<!-- Run the `pr-patrol` skill against this diff before requesting review. It
+checks the change against the conventions and writes its findings to
+artifacts/pr/reviews/. -->
+
+
 - [ ] Follows the conventions in [AGENTS.md](../AGENTS.md).
 - [ ] Every new function and method carries TSDoc.
 - [ ] Every README affected by this change is updated in this pull request.

@@ -12,11 +12,12 @@ Non-negotiable. Each line links to the convention that holds the detail.
 2. **Every query is scoped to the authenticated user** in the repository layer, never handler by handler. [security](.agents/conventions/security.convention.md)
 3. **A locked period is enforced server side** by one gate that every mutating path calls. [data modeling](.agents/conventions/data-modeling.convention.md)
 4. **Money is an integer count of minor units.** Never a floating point number. [data modeling](.agents/conventions/data-modeling.convention.md)
-5. **Log before you throw.** Never swallow an error in a handler, a lifecycle hook, or an async task. [logging](.agents/conventions/logging.convention.md), [error handling](.agents/conventions/error-handling.convention.md)
-6. **No secret in a log, a commit, or a response body.** [security](.agents/conventions/security.convention.md)
-7. **Every change to financial data is audited.** [data modeling](.agents/conventions/data-modeling.convention.md)
-8. **Every function and method carries TSDoc,** and a module's README changes in the same commit as the module. [documentation](.agents/conventions/documentation.convention.md)
-9. **Every commit is `type(scope): description`** with a required scope. [commits](.agents/conventions/commits.convention.md)
+5. **Data is never hard deleted.** Every removal is a soft delete. No `deleteOne`, `deleteMany`, or `findOneAndDelete` in application code. [data modeling](.agents/conventions/data-modeling.convention.md)
+6. **Log before you throw.** Never swallow an error in a handler, a lifecycle hook, or an async task. [logging](.agents/conventions/logging.convention.md), [error handling](.agents/conventions/error-handling.convention.md)
+7. **No secret in a log, a commit, or a response body.** [security](.agents/conventions/security.convention.md)
+8. **Every change to financial data is audited.** [data modeling](.agents/conventions/data-modeling.convention.md)
+9. **Every function and method carries TSDoc,** above the declaration and never inside it, and a module's README changes in the same commit as the module. [tsdoc](.agents/conventions/tsdoc.convention.md), [documentation](.agents/conventions/documentation.convention.md)
+10. **Every commit is `type(scope): description`** with a required scope. [commits](.agents/conventions/commits.convention.md)
 
 ## Conventions
 
@@ -34,6 +35,7 @@ Non-negotiable. Each line links to the convention that holds the detail.
 | [performance](.agents/conventions/performance.convention.md) | Indexes, N+1, pagination, caching, transactions. |
 | [security](.agents/conventions/security.convention.md) | Validation, tenancy, secrets, hashing, rate limits. |
 | [testing](.agents/conventions/testing.convention.md) | Layout, naming, coverage, determinism. |
+| [tsdoc](.agents/conventions/tsdoc.convention.md) | Where a doc block goes, which tags exist, what it must say. |
 
 ## Layout
 
