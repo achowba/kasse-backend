@@ -8,6 +8,7 @@ import {
   MemoryHealthIndicator,
   MongooseHealthIndicator,
 } from '@nestjs/terminus';
+import { Public } from '@common/auth';
 import { ApiVersionEnum } from '@common/enums';
 
 /** Heap ceiling above which the process is considered unhealthy. */
@@ -24,8 +25,12 @@ const DATABASE_PING_TIMEOUT_MS = 1_500;
  * the process should be restarted; it must not depend on anything external, or a
  * database blip would restart every healthy instance. Readiness asks whether this
  * instance should receive traffic, and may check its dependencies.
+ *
+ * Both are public. A probe is issued by an orchestrator that holds no credentials,
+ * and neither response reveals anything beyond whether the service is working.
  */
 @ApiTags('Health')
+@Public()
 @Controller({ path: 'health', version: ApiVersionEnum.V1 })
 export class HealthController {
   constructor(

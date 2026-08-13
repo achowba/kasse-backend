@@ -17,7 +17,7 @@ import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '@common/constants';
  * @property limit - How many records to return.
  * @property offset - How many records to skip.
  */
-export class PaginationQueryDto {
+export class PaginationQueryDTO {
   @ApiPropertyOptional({
     description: 'How many records to return.',
     minimum: 1,

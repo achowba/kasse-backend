@@ -15,6 +15,8 @@ import { NodeEnvEnum } from '@common/enums';
  * @property version - Version reported in the OpenAPI document.
  * @property logLevel - Minimum severity written to the log.
  * @property allowedOrigins - Browser origins allowed by CORS. Empty means none.
+ * @property throttleTtlMs - Rate limit window for ordinary routes, in milliseconds.
+ * @property throttleLimit - Requests allowed per window per caller on ordinary routes.
  */
 export interface IAppConfig {
   nodeEnv: NodeEnvEnum;
@@ -22,6 +24,8 @@ export interface IAppConfig {
   version: string;
   logLevel: string;
   allowedOrigins: string[];
+  throttleTtlMs: number;
+  throttleLimit: number;
 }
 
 /**
@@ -38,4 +42,30 @@ export interface IAppConfig {
 export interface IDatabaseConfig {
   uri: string;
   autoIndex: boolean;
+}
+
+/**
+ * Authentication configuration.
+ *
+ * @remarks
+ * Access tokens are signed asymmetrically. The private key signs and never
+ * leaves this service; the public key only verifies, so another service can
+ * validate a token without holding anything capable of minting one. A shared
+ * symmetric secret would give every verifier full issuing power.
+ *
+ * Refresh tokens are not JWTs and have no signing key. They are opaque random
+ * bytes, stored only as a hash, so there is nothing here for them.
+ *
+ * @property privateKey - PEM encoded signing key.
+ * @property publicKey - PEM encoded verification key.
+ * @property algorithm - JWT signing algorithm. RS256, matching the key pair.
+ * @property accessTtlSeconds - Access token lifetime in seconds.
+ * @property refreshTtlDays - Refresh token lifetime in days.
+ */
+export interface IAuthConfig {
+  privateKey: string;
+  publicKey: string;
+  algorithm: 'RS256';
+  accessTtlSeconds: number;
+  refreshTtlDays: number;
 }

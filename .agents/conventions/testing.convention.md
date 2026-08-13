@@ -29,4 +29,7 @@
 ## Coverage
 
 - Coverage thresholds are enforced in the Jest config and CI fails below them.
+- The unit coverage number is scoped to what unit tests can meaningfully reach. Controllers, repositories, schemas, DTOs, guards, strategies, modules, and the bootstrap are excluded, because they are verified end to end and their unit coverage would measure mocking rather than behaviour. Services, utilities, and configuration stay in scope.
+- Excluding a layer from the number is not excusing it from testing. It moves the obligation to the end to end suite, where a controller is exercised through its real guard, pipe, and filter.
+- When a threshold is not met, write the missing test. Lowering the threshold to match reality is how a suite stops meaning anything.
 - Coverage is a floor, not a goal. A pure calculation like the variance module is expected to be covered exhaustively, including every branch of the plan-is-zero and missing-actual cases. Wiring code is not padded with tests to raise a number.

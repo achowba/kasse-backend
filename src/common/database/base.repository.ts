@@ -1,4 +1,4 @@
-import { ClientSession, Model, ProjectionType, QueryFilter, QueryOptions, Types, UpdateQuery } from 'mongoose';
+import { ClientSession, HydratedDocument, Model, ProjectionType, QueryFilter, QueryOptions, Types, UpdateQuery } from 'mongoose';
 import { TenantOwnedDocument } from './tenant-owned.document';
 
 /**
@@ -44,7 +44,11 @@ export abstract class BaseTenantRepository<TDocument extends TenantOwnedDocument
    * @param session - Optional transaction session.
    * @returns The record, or null when there is none.
    */
-  async findOne(userId: Types.ObjectId, filter: QueryFilter<TDocument> = {}, session?: ClientSession): Promise<TDocument | null> {
+  async findOne(
+    userId: Types.ObjectId,
+    filter: QueryFilter<TDocument> = {},
+    session?: ClientSession,
+  ): Promise<HydratedDocument<TDocument> | null> {
     return await this.model.findOne(this.scope(userId, filter), null, { session }).exec();
   }
 
@@ -61,7 +65,11 @@ export abstract class BaseTenantRepository<TDocument extends TenantOwnedDocument
    * @param session - Optional transaction session.
    * @returns The record, or null when there is none.
    */
-  async findById(userId: Types.ObjectId, id: Types.ObjectId, session?: ClientSession): Promise<TDocument | null> {
+  async findById(
+    userId: Types.ObjectId,
+    id: Types.ObjectId,
+    session?: ClientSession,
+  ): Promise<HydratedDocument<TDocument> | null> {
     return await this.findOne(userId, { _id: id }, session);
   }
 
@@ -76,7 +84,7 @@ export abstract class BaseTenantRepository<TDocument extends TenantOwnedDocument
    * @param id - The record identifier.
    * @returns The record, live or deleted, or null when there is none.
    */
-  async findByIdIncludingDeleted(userId: Types.ObjectId, id: Types.ObjectId): Promise<TDocument | null> {
+  async findByIdIncludingDeleted(userId: Types.ObjectId, id: Types.ObjectId): Promise<HydratedDocument<TDocument> | null> {
     return await this.model.findOne({ _id: id, userId } as QueryFilter<TDocument>).exec();
   }
 
@@ -94,7 +102,7 @@ export abstract class BaseTenantRepository<TDocument extends TenantOwnedDocument
     filter: QueryFilter<TDocument> = {},
     options: QueryOptions<TDocument> = {},
     projection: ProjectionType<TDocument> | null = null,
-  ): Promise<TDocument[]> {
+  ): Promise<HydratedDocument<TDocument>[]> {
     return await this.model.find(this.scope(userId, filter), projection, options).exec();
   }
 
@@ -134,7 +142,7 @@ export abstract class BaseTenantRepository<TDocument extends TenantOwnedDocument
    * @param session - Optional transaction session.
    * @returns The created record.
    */
-  async create(userId: Types.ObjectId, data: Partial<TDocument>, session?: ClientSession): Promise<TDocument> {
+  async create(userId: Types.ObjectId, data: Partial<TDocument>, session?: ClientSession): Promise<HydratedDocument<TDocument>> {
     const document = new this.model({ ...data, userId, deletedAt: null });
 
     return await document.save({ session });
@@ -154,7 +162,7 @@ export abstract class BaseTenantRepository<TDocument extends TenantOwnedDocument
     filter: QueryFilter<TDocument>,
     update: UpdateQuery<TDocument>,
     session?: ClientSession,
-  ): Promise<TDocument | null> {
+  ): Promise<HydratedDocument<TDocument> | null> {
     return await this.model
       .findOneAndUpdate(this.scope(userId, filter), update, { new: true, runValidators: true, session })
       .exec();

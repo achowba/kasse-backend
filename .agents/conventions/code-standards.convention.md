@@ -17,6 +17,13 @@
 - A boolean reads as a predicate: `hasActual`, `isLocked`. Not `actual`, not `lockFlag`.
 - Say what a thing is, not what it is not. `activeOnly` rather than `notArchived`.
 
+### Acronyms
+
+- An acronym in a type name is fully uppercase: `UserResponseDTO`, `CSVImportService`, `ErrorResponseDTO`. Never `Dto`, never `Csv`.
+- A camelCase name that starts with an acronym lowercases the whole acronym: `apiKey`, `csvRows`. Never `aPIKey`.
+- One exception, and it is deliberate: an identifier suffix keeps the conventional `Id` form, as in `userId`, `categoryId`, `requestId`. These are stored schema field names, so renaming them to `userID` would rename fields in every document for no gain, and `Id` is universal in this ecosystem.
+- File names stay kebab-case with a lowercase role suffix: `user-response.dto.ts`, not `user-response.DTO.ts`.
+
 ## Async
 
 - `async`/`await` only. No `.then()` chains.
