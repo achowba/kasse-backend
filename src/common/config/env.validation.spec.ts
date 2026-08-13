@@ -92,6 +92,44 @@ describe('validateEnvironment', () => {
     });
   });
 
+  describe('the limits on the two most expensive routes', () => {
+    // These are read straight from `process.env` by `@common/throttling`, because
+    // `@Throttle` is a decorator and needs its values before an injector exists.
+    // That left them outside this schema, so a malformed value became `NaN`,
+    // every count compared false against it, and the limit was not wrong but
+    // absent, with nothing said at boot.
+    it.each(['REPORT_THROTTLE_LIMIT', 'IMPORT_THROTTLE_LIMIT', 'EXPENSIVE_THROTTLE_TTL_MS'])(
+      'rejects a %s that is not a number',
+      (variable: string) => {
+        expect(() => validateEnvironment({ ...VALID_ENV, [variable]: 'six' })).toThrow(new RegExp(variable));
+      },
+    );
+
+    it.each(['REPORT_THROTTLE_LIMIT', 'IMPORT_THROTTLE_LIMIT', 'EXPENSIVE_THROTTLE_TTL_MS'])(
+      'rejects a %s of zero, which would refuse every request rather than none',
+      (variable: string) => {
+        expect(() => validateEnvironment({ ...VALID_ENV, [variable]: '0' })).toThrow(new RegExp(variable));
+      },
+    );
+
+    it('accepts them absent, since each carries a documented default', () => {
+      expect(() => validateEnvironment({ ...VALID_ENV })).not.toThrow();
+    });
+
+    it('converts them from the strings a process environment always carries', () => {
+      const validated = validateEnvironment({
+        ...VALID_ENV,
+        REPORT_THROTTLE_LIMIT: '30',
+        IMPORT_THROTTLE_LIMIT: '3',
+        EXPENSIVE_THROTTLE_TTL_MS: '30000',
+      });
+
+      expect(validated.REPORT_THROTTLE_LIMIT).toBe(30);
+      expect(validated.IMPORT_THROTTLE_LIMIT).toBe(3);
+      expect(validated.EXPENSIVE_THROTTLE_TTL_MS).toBe(30_000);
+    });
+  });
+
   it('reports every problem at once rather than one per restart', () => {
     let message = '';
 
