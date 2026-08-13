@@ -5,6 +5,7 @@ import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import { MongooseModule } from '@nestjs/mongoose';
 import { PassportModule } from '@nestjs/passport';
 import { IAuthConfig } from '@common/config';
+import { AuditLogModule } from '@modules/audit-log';
 import { UsersModule } from '@modules/users';
 import { TOKEN_ISSUER } from './auth.constants';
 import { AuthController } from './auth.controller';
@@ -31,6 +32,7 @@ import { TokenService } from './token.service';
  */
 @Module({
   imports: [
+    AuditLogModule,
     UsersModule,
     PassportModule,
     MongooseModule.forFeature([{ name: RefreshToken.name, schema: RefreshTokenSchema }]),

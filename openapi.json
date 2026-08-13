@@ -211,6 +211,64 @@
         ]
       }
     },
+    "/api/v1/auth/password": {
+      "patch": {
+        "description": "Replaces the password on the account, ends every other session, and returns a fresh token pair.\n\n**The current password is required**, even though the request is already authenticated. An access token can be lifted from a machine somebody walked away from, and a change that needed only a token would let a borrowed session become a permanent one by locking the owner out of their own account.\n\n**Every refresh token is revoked, including yours.** Changing a password is what people do when they think somebody else has access, so leaving other devices signed in would defeat the reason for doing it. The new pair in the response keeps this caller signed in; every other device is signed out at its next refresh.\n\nStore the returned tokens exactly as you would after a login and discard the old ones. The old access token stays technically valid until it expires, which is minutes, because verification is stateless.\n\nThis is **not** a password reset. Recovering a password nobody knows needs a token sent to an address, which needs an email transport this deployment does not have.",
+        "operationId": "AuthController_changePassword_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The password was changed. Carries a new token pair.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing or invalid, or the current password does not match.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts. Wait and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change your password",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/api/v1/auth/sessions": {
       "get": {
         "description": "Returns every live, unexpired session on the account, newest first.\n\nSessions are identified by when they started and when they were last used, not by a device or browser name. Producing such a name means storing the user agent, and this service does not persist identifiers it does not need.",
@@ -367,6 +425,136 @@
         ]
       }
     },
+    "/api/v1/audit-log": {
+      "get": {
+        "description": "Returns changes to this account's financial data, newest first.\n\nEvery change to a plan, an expense, a category, or a period lock is recorded with the state before and after, so the trail answers what changed rather than only what the record says now. Because deletes are soft and audited, a deleted record's last known state is still readable here.\n\nEach entry carries the `requestId` of the request that made the change, which matches the `x-request-id` response header and the service logs for the same request.\n\nFilter by `entity` and `entityId` to read the history of one record.\n\nThe trail is append only. No route in this API can edit or remove an entry.",
+        "operationId": "AuditLogController_list_v1",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "How many records to return.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "description": "How many records to skip.",
+            "schema": {
+              "minimum": 0,
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "entity",
+            "required": false,
+            "in": "query",
+            "description": "Restrict to one kind of record.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CATEGORY",
+                "PLAN",
+                "EXPENSE",
+                "PERIOD_LOCK",
+                "IMPORT_BATCH",
+                "REPORT",
+                "USER"
+              ]
+            }
+          },
+          {
+            "name": "action",
+            "required": false,
+            "in": "query",
+            "description": "Restrict to one kind of change.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CATEGORY_CREATED",
+                "CATEGORY_UPDATED",
+                "CATEGORY_DELETED",
+                "PLAN_CREATED",
+                "PLAN_UPDATED",
+                "PLAN_DELETED",
+                "EXPENSE_CREATED",
+                "EXPENSE_UPDATED",
+                "EXPENSE_DELETED",
+                "PERIOD_LOCKED",
+                "PERIOD_UNLOCKED",
+                "IMPORT_COMPLETED",
+                "NL_QUERY_RUN",
+                "PASSWORD_CHANGED"
+              ]
+            }
+          },
+          {
+            "name": "entityId",
+            "required": false,
+            "in": "query",
+            "description": "Restrict to the history of a single record.",
+            "schema": {
+              "example": "65f1c2d3e4b5a6c7d8e9f0a2",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the trail, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "pagination"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AuditEntryResponseDTO"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/PaginationDTO"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read the audit trail",
+        "tags": [
+          "Audit log"
+        ]
+      }
+    },
     "/api/v1/me": {
       "get": {
         "description": "Returns the account the access token belongs to, including the currency and fiscal year start that reports are computed against. The password hash is never returned.",
@@ -468,134 +656,6 @@
         "summary": "Update account settings",
         "tags": [
           "Account"
-        ]
-      }
-    },
-    "/api/v1/audit-log": {
-      "get": {
-        "description": "Returns changes to this account's financial data, newest first.\n\nEvery change to a plan, an expense, a category, or a period lock is recorded with the state before and after, so the trail answers what changed rather than only what the record says now. Because deletes are soft and audited, a deleted record's last known state is still readable here.\n\nEach entry carries the `requestId` of the request that made the change, which matches the `x-request-id` response header and the service logs for the same request.\n\nFilter by `entity` and `entityId` to read the history of one record.\n\nThe trail is append only. No route in this API can edit or remove an entry.",
-        "operationId": "AuditLogController_list_v1",
-        "parameters": [
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "How many records to return.",
-            "schema": {
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50,
-              "type": "number"
-            }
-          },
-          {
-            "name": "offset",
-            "required": false,
-            "in": "query",
-            "description": "How many records to skip.",
-            "schema": {
-              "minimum": 0,
-              "default": 0,
-              "type": "number"
-            }
-          },
-          {
-            "name": "entity",
-            "required": false,
-            "in": "query",
-            "description": "Restrict to one kind of record.",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "CATEGORY",
-                "PLAN",
-                "EXPENSE",
-                "PERIOD_LOCK",
-                "IMPORT_BATCH",
-                "REPORT"
-              ]
-            }
-          },
-          {
-            "name": "action",
-            "required": false,
-            "in": "query",
-            "description": "Restrict to one kind of change.",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "CATEGORY_CREATED",
-                "CATEGORY_UPDATED",
-                "CATEGORY_DELETED",
-                "PLAN_CREATED",
-                "PLAN_UPDATED",
-                "PLAN_DELETED",
-                "EXPENSE_CREATED",
-                "EXPENSE_UPDATED",
-                "EXPENSE_DELETED",
-                "PERIOD_LOCKED",
-                "PERIOD_UNLOCKED",
-                "IMPORT_COMPLETED",
-                "NL_QUERY_RUN"
-              ]
-            }
-          },
-          {
-            "name": "entityId",
-            "required": false,
-            "in": "query",
-            "description": "Restrict to the history of a single record.",
-            "schema": {
-              "example": "65f1c2d3e4b5a6c7d8e9f0a2",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A page of the trail, newest first.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "items",
-                    "pagination"
-                  ],
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/AuditEntryResponseDTO"
-                      }
-                    },
-                    "pagination": {
-                      "$ref": "#/components/schemas/PaginationDTO"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "The access token is missing, expired, or invalid.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponseDTO"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Read the audit trail",
-        "tags": [
-          "Audit log"
         ]
       }
     },
@@ -2983,6 +3043,29 @@
           "refreshToken"
         ]
       },
+      "ChangePasswordDTO": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "description": "The password currently on the account. Required even though the caller is already authenticated.",
+            "format": "password",
+            "minLength": 12,
+            "maxLength": 128
+          },
+          "newPassword": {
+            "type": "string",
+            "description": "The new password. Same rules as signup: length is the single strongest factor, so the floor is high.",
+            "format": "password",
+            "minLength": 12,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ]
+      },
       "SessionResponseDTO": {
         "type": "object",
         "properties": {
@@ -3022,27 +3105,6 @@
         "type": "object",
         "properties": {}
       },
-      "UpdateMeDTO": {
-        "type": "object",
-        "properties": {
-          "currency": {
-            "type": "string",
-            "description": "Currency the account is denominated in. Changing it relabels existing amounts, it does not convert them.",
-            "enum": [
-              "USD",
-              "AED"
-            ],
-            "example": "AED"
-          },
-          "fiscalYearStartMonth": {
-            "type": "number",
-            "description": "Month the fiscal year starts. 1 is January, which makes the fiscal year the calendar year.",
-            "example": 4,
-            "minimum": 1,
-            "maximum": 12
-          }
-        }
-      },
       "AuditEntryResponseDTO": {
         "type": "object",
         "properties": {
@@ -3067,7 +3129,8 @@
               "PERIOD_LOCKED",
               "PERIOD_UNLOCKED",
               "IMPORT_COMPLETED",
-              "NL_QUERY_RUN"
+              "NL_QUERY_RUN",
+              "PASSWORD_CHANGED"
             ],
             "example": "PLAN_UPDATED"
           },
@@ -3080,7 +3143,8 @@
               "EXPENSE",
               "PERIOD_LOCK",
               "IMPORT_BATCH",
-              "REPORT"
+              "REPORT",
+              "USER"
             ],
             "example": "PLAN"
           },
@@ -3150,6 +3214,27 @@
           "offset",
           "total"
         ]
+      },
+      "UpdateMeDTO": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "description": "Currency the account is denominated in. Changing it relabels existing amounts, it does not convert them.",
+            "enum": [
+              "USD",
+              "AED"
+            ],
+            "example": "AED"
+          },
+          "fiscalYearStartMonth": {
+            "type": "number",
+            "description": "Month the fiscal year starts. 1 is January, which makes the fiscal year the calendar year.",
+            "example": 4,
+            "minimum": 1,
+            "maximum": 12
+          }
+        }
       },
       "CategoryResponseDTO": {
         "type": "object",

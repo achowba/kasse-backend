@@ -19,6 +19,7 @@
  * @property PERIOD_UNLOCKED - A month was unlocked.
  * @property IMPORT_COMPLETED - A CSV import committed.
  * @property NL_QUERY_RUN - A question was turned into a report filter and run.
+ * @property PASSWORD_CHANGED - An account changed its own password.
  */
 export enum AuditActionEnum {
   CATEGORY_CREATED = 'CATEGORY_CREATED',
@@ -34,6 +35,7 @@ export enum AuditActionEnum {
   PERIOD_UNLOCKED = 'PERIOD_UNLOCKED',
   IMPORT_COMPLETED = 'IMPORT_COMPLETED',
   NL_QUERY_RUN = 'NL_QUERY_RUN',
+  PASSWORD_CHANGED = 'PASSWORD_CHANGED',
 }
 
 /**
@@ -45,6 +47,7 @@ export enum AuditActionEnum {
  * @property PERIOD_LOCK - A locked month.
  * @property IMPORT_BATCH - A CSV import.
  * @property REPORT - A report that was read rather than a record that was changed.
+ * @property USER - The account itself, rather than anything it owns.
  */
 export enum AuditEntityEnum {
   CATEGORY = 'CATEGORY',
@@ -53,4 +56,5 @@ export enum AuditEntityEnum {
   PERIOD_LOCK = 'PERIOD_LOCK',
   IMPORT_BATCH = 'IMPORT_BATCH',
   REPORT = 'REPORT',
+  USER = 'USER',
 }

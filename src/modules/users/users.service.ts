@@ -81,6 +81,30 @@ export class UsersService {
   }
 
   /**
+   * Replaces an account's password hash.
+   *
+   * @remarks
+   * Takes a hash, never a password, exactly as {@link create} does. Hashing lives
+   * in the auth module with the argon2 parameters, and this module owns the
+   * collection. Splitting it that way keeps the cost parameters in one place and
+   * means a plaintext password never reaches a service whose job is storage.
+   *
+   * Whether the caller is allowed to do this is decided before it is called.
+   * This says nothing about proof of identity; it writes.
+   *
+   * @param id - The account identifier.
+   * @param passwordHash - The new Argon2id hash.
+   * @throws NotFoundException When no live account has that id.
+   */
+  async updatePassword(id: Types.ObjectId, passwordHash: string): Promise<void> {
+    const updated = await this.usersRepository.updatePasswordHash(id, passwordHash);
+
+    if (!updated) {
+      throw new NotFoundException('Account not found.');
+    }
+  }
+
+  /**
    * Changes the settings a user is allowed to change.
    *
    * @remarks

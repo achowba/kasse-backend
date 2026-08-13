@@ -485,6 +485,7 @@ Target is Railway with MongoDB Atlas. Atlas is already a replica set, so transac
 | **Shared category catalogue** | 40 categories with no owner, readable by everyone. | Copying them per signup would mean 40 stale duplicates per account, so categories need their own repository rather than plain tenancy. |
 | **Variance computed in the pipeline** | The database does the arithmetic, but `calculateVariance` remains the definition, exhaustively unit tested without a database. | Two implementations, held together by a parity test. That test found a real `-0` bug on its first run. |
 | **One currency per account** | Amounts are stored with no currency of their own. | Multi-currency would need a currency on every record and a rate table. Out of scope, and said so rather than half built. |
+| **No password reset** | A signed in user can change their password at `PATCH /auth/password`, which requires the current one and ends every other session. Recovering a *forgotten* password is not implemented. | A reset needs a single use token delivered to the address on the account, which needs an email transport this deployment has no provider for. Adding one would mean a new external integration and credentials in every environment, for something no requirement asks for. Out of scope, and said so rather than half built. |
 
 ---
 

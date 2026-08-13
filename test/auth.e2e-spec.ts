@@ -371,4 +371,120 @@ describe('Auth (e2e)', () => {
         .expect(400);
     });
   });
+
+  describe('changing a password', () => {
+    const NEW_PASSWORD = 'a replacement password';
+
+    /**
+     * Changes the password on an account.
+     *
+     * @param accessToken - The caller's access token.
+     * @param currentPassword - The password to prove identity with.
+     * @param newPassword - The replacement.
+     * @returns The supertest response.
+     */
+    const changePassword = (accessToken: string, currentPassword: string, newPassword: string): request.Test =>
+      request(server())
+        .patch('/api/v1/auth/password')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ currentPassword, newPassword });
+
+    it('refuses without an access token', async () => {
+      await request(server())
+        .patch('/api/v1/auth/password')
+        .send({ currentPassword: PASSWORD, newPassword: NEW_PASSWORD })
+        .expect(401);
+    });
+
+    it('refuses a wrong current password even though the token is valid', async () => {
+      const { accessToken } = await signup('wrong-current');
+
+      const response = await changePassword(accessToken, 'not the current password', NEW_PASSWORD).expect(401);
+
+      expect((response.body as { code: string }).code).toBe('UNAUTHENTICATED');
+    });
+
+    it('leaves the old password working when the change is refused', async () => {
+      const { user, accessToken } = await signup('refused-change');
+
+      await changePassword(accessToken, 'not the current password', NEW_PASSWORD).expect(401);
+
+      // A refusal that had quietly written the new hash would be far worse than
+      // the refusal itself.
+      await request(server()).post('/api/v1/auth/login').send({ email: user.email, password: PASSWORD }).expect(200);
+    });
+
+    it('rejects a new password below the length floor', async () => {
+      const { accessToken } = await signup('short-new');
+
+      const response = await changePassword(accessToken, PASSWORD, 'short').expect(400);
+
+      // The same floor signup enforces. A change route that accepted a weaker
+      // password than registration would quietly undo the rule.
+      expect((response.body as { code: string }).code).toBe('VALIDATION_FAILED');
+    });
+
+    it('changes the password and returns a usable new pair', async () => {
+      const { accessToken } = await signup('happy-change');
+
+      const response = await changePassword(accessToken, PASSWORD, NEW_PASSWORD).expect(200);
+      const body = response.body as IAuthBody;
+
+      expect(body.accessToken).toBeDefined();
+      expect(body.refreshToken).toBeDefined();
+
+      // The returned token has to work, or the caller is signed out by their own
+      // password change, which is the thing the fresh pair exists to prevent.
+      await request(server()).get('/api/v1/me').set('Authorization', `Bearer ${body.accessToken}`).expect(200);
+    });
+
+    it('makes the new password the one that logs in, and retires the old', async () => {
+      const { user, accessToken } = await signup('login-after-change');
+
+      await changePassword(accessToken, PASSWORD, NEW_PASSWORD).expect(200);
+
+      await request(server()).post('/api/v1/auth/login').send({ email: user.email, password: NEW_PASSWORD }).expect(200);
+      await request(server()).post('/api/v1/auth/login').send({ email: user.email, password: PASSWORD }).expect(401);
+    });
+
+    it('kills every other session, which is the point of doing it', async () => {
+      const { user, accessToken } = await signup('kills-sessions');
+
+      // A second device, signed in before the change.
+      const other = await request(server())
+        .post('/api/v1/auth/login')
+        .send({ email: user.email, password: PASSWORD })
+        .expect(200);
+      const otherRefreshToken = (other.body as IAuthBody).refreshToken;
+
+      await changePassword(accessToken, PASSWORD, NEW_PASSWORD).expect(200);
+
+      // Changing a password is what somebody does when they think another
+      // person has access. A device left signed in would defeat that entirely.
+      await request(server()).post('/api/v1/auth/refresh').send({ refreshToken: otherRefreshToken }).expect(401);
+    });
+
+    it('retires the refresh token the caller held before the change', async () => {
+      const { refreshToken, accessToken } = await signup('own-token-dies');
+
+      await changePassword(accessToken, PASSWORD, NEW_PASSWORD).expect(200);
+
+      await request(server()).post('/api/v1/auth/refresh').send({ refreshToken }).expect(401);
+    });
+
+    it('records the change in the audit log without either password', async () => {
+      const { accessToken } = await signup('audited-change');
+
+      const changed = await changePassword(accessToken, PASSWORD, NEW_PASSWORD).expect(200);
+      const fresh = (changed.body as IAuthBody).accessToken;
+
+      const audit = await request(server()).get('/api/v1/audit-log?limit=10').set('Authorization', `Bearer ${fresh}`).expect(200);
+
+      const entries = (audit.body as { items: { action: string }[] }).items;
+
+      expect(entries.some((entry) => entry.action === 'PASSWORD_CHANGED')).toBe(true);
+      expect(JSON.stringify(entries)).not.toContain(NEW_PASSWORD);
+      expect(JSON.stringify(entries)).not.toContain(PASSWORD);
+    });
+  });
 });

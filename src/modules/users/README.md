@@ -29,6 +29,8 @@ Credentials are not handled here. Hashing and verification belong to `modules/au
 
 Both act on the caller's own account, taken from the access token. No route takes a user id, so one account cannot address another.
 
+Changing a password is **not** here. The hash lives in this collection and `updatePassword` writes it, but the route is `PATCH /auth/password` in [auth](../auth/README.md), because deciding whether a change is allowed means verifying the current password and revoking sessions, and both live there. Putting the route here would have made this module depend on auth, which already depends on this one.
+
 ## Dependencies on other modules
 
 `@common/database` for the document base and the soft delete field. `@common/auth` for the `@CurrentUser` decorator. `@common/errors` for the documented error shape.

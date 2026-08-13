@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -18,9 +18,11 @@ import { CurrentUser, type IAuthenticatedUser, Public } from '@common/auth';
 import { ApiVersionEnum } from '@common/enums';
 import { ErrorResponseDTO } from '@common/errors';
 import { ParseObjectIdPipe } from '@common/pipes';
+import { RequestId } from '@common/request-context';
 import { AUTH_THROTTLE_LIMIT, AUTH_THROTTLE_TTL_MS } from './auth.constants';
 import { AuthService } from './auth.service';
 import { AuthResponseDTO } from './dto/auth-response.dto';
+import { ChangePasswordDTO } from './dto/change-password.dto';
 import { CredentialsDTO } from './dto/credentials.dto';
 import { RefreshTokenDTO } from './dto/refresh-token.dto';
 import { SessionResponseDTO } from './dto/session-response.dto';
@@ -135,6 +137,41 @@ The access token is not revoked and remains valid until it expires, which is min
   @ApiUnauthorizedResponse({ description: 'The access token is missing, expired, or invalid.', type: ErrorResponseDTO })
   async logout(@CurrentUser() user: IAuthenticatedUser, @Body() body: RefreshTokenDTO): Promise<void> {
     await this.authService.logout(user.userId, body.refreshToken);
+  }
+
+  /**
+   * Replaces the caller's password.
+   *
+   * @param user - The authenticated caller.
+   * @param input - The current password and its replacement.
+   * @param requestId - The request making the change.
+   * @returns A new token pair.
+   */
+  @Patch('password')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Change your password',
+    description: `Replaces the password on the account, ends every other session, and returns a fresh token pair.
+
+**The current password is required**, even though the request is already authenticated. An access token can be lifted from a machine somebody walked away from, and a change that needed only a token would let a borrowed session become a permanent one by locking the owner out of their own account.
+
+**Every refresh token is revoked, including yours.** Changing a password is what people do when they think somebody else has access, so leaving other devices signed in would defeat the reason for doing it. The new pair in the response keeps this caller signed in; every other device is signed out at its next refresh.
+
+Store the returned tokens exactly as you would after a login and discard the old ones. The old access token stays technically valid until it expires, which is minutes, because verification is stateless.
+
+This is **not** a password reset. Recovering a password nobody knows needs a token sent to an address, which needs an email transport this deployment does not have.`,
+  })
+  @ApiOkResponse({ description: 'The password was changed. Carries a new token pair.', type: AuthResponseDTO })
+  @ApiUnauthorizedResponse({
+    description: 'The access token is missing or invalid, or the current password does not match.',
+    type: ErrorResponseDTO,
+  })
+  async changePassword(
+    @CurrentUser() user: IAuthenticatedUser,
+    @Body() input: ChangePasswordDTO,
+    @RequestId() requestId?: string,
+  ): Promise<AuthResponseDTO> {
+    return await this.authService.changePassword(user.userId, input, requestId);
   }
 
   /**
