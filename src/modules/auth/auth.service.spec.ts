@@ -1,6 +1,7 @@
 import { ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { Connection, Types } from 'mongoose';
 import { CurrencyEnum } from '@common/enums';
+import { AuditActionEnum, AuditLogService } from '@modules/audit-log';
 import { UserDocument, UsersService } from '@modules/users';
 import { AuthService } from './auth.service';
 import { PasswordService } from './password.service';
@@ -34,8 +35,11 @@ const buildTokenRecord = (overrides: Partial<RefreshTokenDocument> = {}): Refres
   }) as RefreshTokenDocument;
 
 describe('AuthService', () => {
-  let usersService: jest.Mocked<Pick<UsersService, 'isEmailTaken' | 'create' | 'findByEmail' | 'findById'>>;
+  let usersService: jest.Mocked<
+    Pick<UsersService, 'isEmailTaken' | 'create' | 'findByEmail' | 'findById' | 'getById' | 'updatePassword'>
+  >;
   let passwordService: jest.Mocked<Pick<PasswordService, 'hash' | 'verify'>>;
+  let auditLog: jest.Mocked<Pick<AuditLogService, 'record'>>;
   let tokenService: jest.Mocked<Pick<TokenService, 'issueAccessToken' | 'createRefreshToken' | 'hashRefreshToken'>>;
   let refreshTokens: jest.Mocked<
     Pick<RefreshTokensRepository, 'findByHash' | 'issue' | 'revoke' | 'revokeFamily' | 'revokeAll' | 'listActive' | 'markUsed'>
@@ -48,7 +52,11 @@ describe('AuthService', () => {
       create: jest.fn().mockResolvedValue(buildUser()),
       findByEmail: jest.fn().mockResolvedValue(null),
       findById: jest.fn().mockResolvedValue(buildUser()),
+      getById: jest.fn().mockResolvedValue(buildUser()),
+      updatePassword: jest.fn().mockResolvedValue(undefined),
     };
+
+    auditLog = { record: jest.fn() };
 
     passwordService = {
       hash: jest.fn().mockResolvedValue('$argon2id$new'),
@@ -84,6 +92,7 @@ describe('AuthService', () => {
       passwordService,
       tokenService as unknown as TokenService,
       refreshTokens as unknown as RefreshTokensRepository,
+      auditLog as unknown as AuditLogService,
       connection,
     );
   });
@@ -250,6 +259,79 @@ describe('AuthService', () => {
 
     it('reports how many sessions ending everything revoked', async () => {
       await expect(service.revokeAllSessions(new Types.ObjectId())).resolves.toBe(3);
+    });
+  });
+
+  describe('changePassword', () => {
+    const change = { currentPassword: 'the current password', newPassword: 'a brand new password' };
+
+    it('rejects a wrong current password, even though the caller is authenticated', async () => {
+      // The whole security model of this route. A token can be lifted from an
+      // unlocked machine, and a change needing only a token would turn a
+      // borrowed session into a permanent one.
+      passwordService.verify.mockResolvedValue(false);
+
+      await expect(service.changePassword(new Types.ObjectId(), change)).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('writes nothing when the current password is wrong', async () => {
+      passwordService.verify.mockResolvedValue(false);
+
+      await expect(service.changePassword(new Types.ObjectId(), change)).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(usersService.updatePassword).not.toHaveBeenCalled();
+      expect(refreshTokens.revokeAll).not.toHaveBeenCalled();
+    });
+
+    it('verifies against the stored hash rather than anything supplied', async () => {
+      const user = buildUser();
+
+      usersService.getById.mockResolvedValue(user);
+
+      await service.changePassword(user._id, change);
+
+      expect(passwordService.verify).toHaveBeenCalledWith(user.passwordHash, 'the current password');
+    });
+
+    it('stores a hash of the new password and never the password', async () => {
+      const userId = new Types.ObjectId();
+
+      usersService.getById.mockResolvedValue(buildUser(userId));
+
+      await service.changePassword(userId, change);
+
+      expect(passwordService.hash).toHaveBeenCalledWith('a brand new password');
+      expect(usersService.updatePassword).toHaveBeenCalledWith(userId, '$argon2id$new');
+    });
+
+    it('revokes every refresh token, including the caller’s own', async () => {
+      const userId = new Types.ObjectId();
+
+      usersService.getById.mockResolvedValue(buildUser(userId));
+
+      await service.changePassword(userId, change);
+
+      // Changing a password is what people do when they believe somebody else
+      // has access, so sparing other devices would defeat the reason for it.
+      expect(refreshTokens.revokeAll).toHaveBeenCalledWith(userId);
+    });
+
+    it('returns a fresh pair, so the caller is not signed out by their own change', async () => {
+      const result = await service.changePassword(new Types.ObjectId(), change);
+
+      expect(result.accessToken).toBeDefined();
+      expect(result.refreshToken).toBeDefined();
+    });
+
+    it('records the change without either password or any hash', async () => {
+      await service.changePassword(new Types.ObjectId(), change, 'req-9');
+
+      const entry = auditLog.record.mock.calls[0]?.[0];
+
+      expect(entry).toEqual(
+        expect.objectContaining({ action: AuditActionEnum.PASSWORD_CHANGED, requestId: 'req-9', after: { sessionsRevoked: 3 } }),
+      );
+      expect(JSON.stringify(entry)).not.toContain('password');
+      expect(JSON.stringify(entry)).not.toContain('argon2');
     });
   });
 });

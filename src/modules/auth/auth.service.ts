@@ -2,9 +2,11 @@ import { ConflictException, Injectable, Logger, NotFoundException, UnauthorizedE
 import { InjectConnection } from '@nestjs/mongoose';
 import { ClientSession, Connection, Types } from 'mongoose';
 import { withTransaction } from '@common/database';
+import { AuditActionEnum, AuditEntityEnum, AuditLogService } from '@modules/audit-log';
 import { UserDocument, UserResponseDTO, UsersService } from '@modules/users';
 import { INVALID_CREDENTIALS } from './auth.constants';
 import { AuthResponseDTO } from './dto/auth-response.dto';
+import { ChangePasswordDTO } from './dto/change-password.dto';
 import { CredentialsDTO } from './dto/credentials.dto';
 import { SessionResponseDTO } from './dto/session-response.dto';
 import { PasswordService } from './password.service';
@@ -38,6 +40,7 @@ export class AuthService {
     private readonly passwordService: PasswordService,
     private readonly tokenService: TokenService,
     private readonly refreshTokensRepository: RefreshTokensRepository,
+    private readonly auditLogService: AuditLogService,
     @InjectConnection() private readonly connection: Connection,
   ) {}
 
@@ -237,6 +240,72 @@ export class AuthService {
     this.logger.log({ userId: userId.toString(), revokedCount }, 'all sessions revoked');
 
     return revokedCount;
+  }
+
+  /**
+   * Replaces the caller's password and cuts off every session but this one.
+   *
+   * @remarks
+   * The current password is required even though the caller already holds a
+   * valid access token, and that is the point rather than a formality. A token
+   * can be lifted from an unlocked machine, and a change that needed only a
+   * token would let a borrowed session become a permanent one by locking the
+   * owner out of their own account. Knowing the current password is the only
+   * evidence here that the person asking is the account holder.
+   *
+   * Every refresh token is revoked, including the caller's, and a new pair is
+   * issued in the same breath. Changing a password is the thing people do
+   * **because** they think someone else has access, so leaving other devices
+   * signed in would defeat the reason for doing it. Issuing a fresh pair means
+   * the caller stays signed in and everybody else is cut off, which is the
+   * behaviour a user expects without having to be told.
+   *
+   * A wrong current password is reported as `INVALID_CREDENTIALS`, the same text
+   * login uses. There is no account enumeration risk here, since the caller is
+   * already authenticated, but reusing the message keeps one answer for one
+   * situation.
+   *
+   * @steps
+   * 1. Load the account and verify the current password against its hash.
+   * 2. Hash the new password with the same parameters signup uses.
+   * 3. Store it.
+   * 4. Revoke every refresh token the account has.
+   * 5. Issue a fresh pair, so this caller alone remains signed in.
+   * 6. Record the change, without either password.
+   *
+   * @param userId - The authenticated caller.
+   * @param input - The current password and its replacement.
+   * @param requestId - The request making the change.
+   * @returns A new token pair.
+   * @throws UnauthorizedException When the current password does not match.
+   */
+  async changePassword(userId: Types.ObjectId, input: ChangePasswordDTO, requestId?: string): Promise<AuthResponseDTO> {
+    const user = await this.usersService.getById(userId);
+
+    if (!(await this.passwordService.verify(user.passwordHash, input.currentPassword))) {
+      this.logger.log({ userId: userId.toString() }, 'password change rejected: wrong current password');
+
+      throw new UnauthorizedException(INVALID_CREDENTIALS);
+    }
+
+    await this.usersService.updatePassword(userId, await this.passwordService.hash(input.newPassword));
+
+    const revokedCount = await this.refreshTokensRepository.revokeAll(userId);
+
+    this.logger.log({ userId: userId.toString(), revokedCount }, 'password changed, sessions revoked');
+
+    this.auditLogService.record({
+      userId,
+      action: AuditActionEnum.PASSWORD_CHANGED,
+      entity: AuditEntityEnum.USER,
+      entityId: userId,
+      // Neither password, old or new, and no hash. The entry records that it
+      // happened and what it cost the account's other sessions.
+      after: { sessionsRevoked: revokedCount },
+      requestId,
+    });
+
+    return await this.establishSession(user);
   }
 
   /**

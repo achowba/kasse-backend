@@ -48,6 +48,16 @@ A session is identified by when it started and when it was last used. Naming the
 
 Depends on `modules/users` to create and read accounts. Every other feature module depends on this one indirectly, through the global guard and the `@CurrentUser` decorator in `@common/auth`.
 
+## Changing a password, and why it is not a reset
+
+`PATCH /auth/password` replaces the password for somebody who already knows it. **The current password is required even though the request is authenticated**, and that is the security model rather than a formality. An access token can be lifted from a machine somebody walked away from, and a change needing only a token would let a borrowed session become a permanent one by locking the owner out of their own account. Knowing the current password is the only evidence here that the caller is the account holder.
+
+Every refresh token is revoked, the caller's included, and a fresh pair is returned in the same response. Changing a password is what people do **because** they believe somebody else has access, so leaving other devices signed in would defeat the reason for doing it. The new pair means the caller alone stays signed in.
+
+The old access token stays valid until it expires, which is minutes. That is the standing tradeoff of stateless verification, the same one `logout` carries.
+
+**Recovering a forgotten password is not implemented.** It needs a single use token delivered to the address on the account, which needs an email transport this deployment has no provider for. Out of scope, and said so rather than half built.
+
 ## Endpoints
 
 | Method | Path | Auth | Purpose |
@@ -56,6 +66,7 @@ Depends on `modules/users` to create and read accounts. Every other feature modu
 | `POST` | `/api/v1/auth/login` | Public | Exchange credentials for a token pair. |
 | `POST` | `/api/v1/auth/refresh` | Public | Exchange a refresh token for a new pair. The token is the credential. |
 | `POST` | `/api/v1/auth/logout` | Bearer | Revoke one refresh token. |
+| `PATCH` | `/api/v1/auth/password` | Bearer | Change the password, ending every other session. Requires the current one. |
 | `GET` | `/api/v1/auth/sessions` | Bearer | List active sessions. |
 | `DELETE` | `/api/v1/auth/sessions` | Bearer | End every session, including the caller's. |
 | `DELETE` | `/api/v1/auth/sessions/:sessionId` | Bearer | End one session. |
@@ -64,4 +75,4 @@ The credential routes are rate limited harder than the rest of the API, because 
 
 ## Dependencies on other modules
 
-`@modules/users` for accounts. `@common/auth` for the request-level primitives. `@common/config` for the keys and lifetimes. `@common/database` for the tenant scoped repository and the transaction helper. `@common/pipes` for identifier parsing.
+`@modules/users` for accounts and for the password hash it stores. `@modules/audit-log` to record a password change. `@common/auth` for the request-level primitives. `@common/config` for the keys and lifetimes. `@common/database` for the tenant scoped repository and the transaction helper. `@common/pipes` for identifier parsing.

@@ -60,6 +60,27 @@ export class UsersRepository {
   }
 
   /**
+   * Replaces an account's password hash.
+   *
+   * @remarks
+   * Kept apart from {@link updateSettings} rather than folded into it. That takes
+   * a bag of fields a user may change about themselves, and a credential is not
+   * one of those: it has its own route, its own proof of identity, and its own
+   * consequence for every live session. A single method taking both would make
+   * it possible to change a password by accident, through a handler that thought
+   * it was only setting a currency.
+   *
+   * @param id - The account identifier.
+   * @param passwordHash - The new Argon2id hash.
+   * @returns True when an account was updated.
+   */
+  async updatePasswordHash(id: Types.ObjectId, passwordHash: string): Promise<boolean> {
+    const result = await this.model.updateOne({ _id: id, deletedAt: null }, { $set: { passwordHash } }).exec();
+
+    return result.matchedCount > 0;
+  }
+
+  /**
    * Updates the settings a user is allowed to change.
    *
    * @param id - The account identifier.
