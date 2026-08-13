@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import { SwaggerTheme, SwaggerThemeNameEnum } from 'swagger-themes';
+import { NodeEnvEnum } from '@common/enums';
 import { API_DESCRIPTION, API_TAGS, SWAGGER_UI_OPTIONS } from './swagger.constants';
 
 /**
@@ -44,6 +45,14 @@ export const buildOpenApiDocument = (app: INestApplication, version: string): Op
  *
  * @param app - The application to attach the OpenAPI document and UI to.
  * @param version - The API document version, from application config.
+ */
+export const areDocsEnabled = (nodeEnv: NodeEnvEnum): boolean => nodeEnv !== NodeEnvEnum.PRODUCTION;
+
+/**
+ * Mounts the documentation UI and its JSON document.
+ *
+ * @param app - The application to mount on.
+ * @param version - The documented contract version.
  */
 export const setupSwagger = (app: INestApplication, version: string): void => {
   SwaggerModule.setup('docs', app, buildOpenApiDocument(app, version), {

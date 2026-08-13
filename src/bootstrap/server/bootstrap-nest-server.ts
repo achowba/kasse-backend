@@ -7,7 +7,7 @@ import { API_PREFIX } from '@common/constants';
 import { ApiVersionEnum, NodeEnvEnum } from '@common/enums';
 import { AllExceptionsFilter } from '@common/errors';
 import { buildLoggerOptions } from '@common/logging';
-import { setupSwagger } from '../swagger';
+import { areDocsEnabled, setupSwagger } from '../swagger';
 
 /**
  * Applies global middleware, versioning, validation, and documentation.
@@ -36,7 +36,7 @@ export const bootstrapNestServer = (app: INestApplication): INestApplication => 
   const logger = new Logger('bootstrapNestServer');
   const appConfig = app.get(ConfigService).getOrThrow<IAppConfig>('app');
   const isDevelopmentOrTest = [NodeEnvEnum.DEVELOPMENT, NodeEnvEnum.TEST].includes(appConfig.nodeEnv);
-  const isDocsEnabled = ![NodeEnvEnum.PRODUCTION, NodeEnvEnum.TEST].includes(appConfig.nodeEnv);
+  const isDocsEnabled = areDocsEnabled(appConfig.nodeEnv);
 
   // Before everything, so a request is logged and carries an id no matter what
   // happens to it afterwards.
