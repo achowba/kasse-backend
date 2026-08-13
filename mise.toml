@@ -1,0 +1,10 @@
+# Tool versions for this repo. Run `mise install` after cloning.
+#
+# This file is the source of truth. `.nvmrc` mirrors the same major version so
+# that plain nvm users and the CI `setup-node` step resolve the same runtime.
+#
+# Environment variables are deliberately not loaded here. The application reads
+# and validates `.env` itself at boot, so there is one code path for local runs
+# and for deployed instances.
+[tools]
+node = "22"
