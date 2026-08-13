@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { DataVersionService } from '@common/cache';
 import { MissingActualPolicyEnum } from '@common/money';
+import { UsersService } from '@modules/users';
 import { ReportQueryDTO } from './dto/report-query.dto';
 import { SeriesGroupByEnum } from './reports.enums';
 import { IReportCell, ReportsRepository } from './reports.repository';
@@ -47,6 +48,7 @@ describe('ReportsService', () => {
   const userId = new Types.ObjectId();
   let repository: jest.Mocked<Pick<ReportsRepository, 'aggregate' | 'series'>>;
   let dataVersion: DataVersionService;
+  let users: jest.Mocked<Pick<UsersService, 'findById'>>;
   let service: ReportsService;
 
   const query = (overrides: Partial<ReportQueryDTO> = {}): ReportQueryDTO => ({
@@ -70,7 +72,8 @@ describe('ReportsService', () => {
     // The real one. It holds nothing but a counter, and the cache behaviour under
     // test is precisely how the service and the counter interact.
     dataVersion = new DataVersionService();
-    service = new ReportsService(repository as unknown as ReportsRepository, dataVersion);
+    users = { findById: jest.fn().mockResolvedValue({ fiscalYearStartMonth: 1 }) };
+    service = new ReportsService(repository as unknown as ReportsRepository, dataVersion, users as unknown as UsersService);
   });
 
   describe('the published sample table', () => {
@@ -279,6 +282,72 @@ describe('ReportsService', () => {
       await service.planVsActual(userId, query({ categoryIds: [b, a] }));
 
       expect(repository.aggregate).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('fiscal year', () => {
+    it('resolves a calendar fiscal year to January through December', async () => {
+      users.findById.mockResolvedValue({ fiscalYearStartMonth: 1 } as never);
+
+      await service.planVsActual(userId, { fiscalYear: 2026, limit: 50, offset: 0 });
+
+      expect(repository.aggregate).toHaveBeenCalledWith(userId, '2026-01', '2026-12', [], 50, 0);
+    });
+
+    it('resolves an April start to the following March, crossing the calendar year', async () => {
+      users.findById.mockResolvedValue({ fiscalYearStartMonth: 4 } as never);
+
+      await service.planVsActual(userId, { fiscalYear: 2026, limit: 50, offset: 0 });
+
+      // The end month is in 2027. Adding eleven months to April has to roll the
+      // year over rather than producing month 15.
+      expect(repository.aggregate).toHaveBeenCalledWith(userId, '2026-04', '2027-03', [], 50, 0);
+    });
+
+    it('resolves a December start to the following November', async () => {
+      users.findById.mockResolvedValue({ fiscalYearStartMonth: 12 } as never);
+
+      await service.planVsActual(userId, { fiscalYear: 2026, limit: 50, offset: 0 });
+
+      expect(repository.aggregate).toHaveBeenCalledWith(userId, '2026-12', '2027-11', [], 50, 0);
+    });
+
+    it('takes precedence over from and to, so a request carrying both has one meaning', async () => {
+      users.findById.mockResolvedValue({ fiscalYearStartMonth: 1 } as never);
+
+      await service.planVsActual(userId, { fiscalYear: 2026, from: '2030-01', to: '2030-06', limit: 50, offset: 0 });
+
+      expect(repository.aggregate).toHaveBeenCalledWith(userId, '2026-01', '2026-12', [], 50, 0);
+    });
+
+    it('keys the cache on the resolved months, so changing the start month needs no invalidation', async () => {
+      users.findById.mockResolvedValue({ fiscalYearStartMonth: 1 } as never);
+      await service.planVsActual(userId, { fiscalYear: 2026, limit: 50, offset: 0 });
+
+      users.findById.mockResolvedValue({ fiscalYearStartMonth: 4 } as never);
+      await service.planVsActual(userId, { fiscalYear: 2026, limit: 50, offset: 0 });
+
+      // Same request, different answer, and no cache bump anywhere: the resolved
+      // range is part of the key, so the second lookup simply misses.
+      expect(repository.aggregate).toHaveBeenCalledTimes(2);
+    });
+
+    it('rejects a request naming no range at all', async () => {
+      await expect(service.planVsActual(userId, { limit: 50, offset: 0 })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects a half specified range', async () => {
+      await expect(service.planVsActual(userId, { from: '2026-01', limit: 50, offset: 0 })).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    });
+
+    it('applies to the chart series too', async () => {
+      users.findById.mockResolvedValue({ fiscalYearStartMonth: 7 } as never);
+
+      await service.series(userId, { fiscalYear: 2026 });
+
+      expect(repository.series).toHaveBeenCalledWith(userId, '2026-07', '2027-06', [], SeriesGroupByEnum.MONTH);
     });
   });
 

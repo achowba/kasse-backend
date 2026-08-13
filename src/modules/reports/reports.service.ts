@@ -2,7 +2,8 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { DataVersionService } from '@common/cache';
 import { calculateVariance, MissingActualPolicyEnum } from '@common/money';
-import { compareMonths } from '@common/month';
+import { compareMonths, fiscalYearRange } from '@common/month';
+import { UsersService } from '@modules/users';
 import { ReportQueryDTO } from './dto/report-query.dto';
 import { ReportResponseDTO, ReportRowDTO, ReportTotalsDTO } from './dto/report-response.dto';
 import { SeriesQueryDTO } from './dto/series-query.dto';
@@ -11,6 +12,24 @@ import { renderReportCsv } from './report-csv';
 import { MAX_EXPORT_ROWS, REPORT_CACHE_MAX_ENTRIES, REPORT_CACHE_TTL_MS } from './reports.constants';
 import { SeriesGroupByEnum } from './reports.enums';
 import { IReportCell, IReportTotals, ReportsRepository } from './reports.repository';
+
+/**
+ * The three ways a caller can name a range.
+ *
+ * @remarks
+ * Narrower than either query DTO on purpose. Range resolution needs these three
+ * fields and nothing else, so the table, the chart, and the export can all pass
+ * their own shape without one of them having to grow a `limit` it has no use for.
+ *
+ * @property from - First month, inclusive.
+ * @property to - Last month, inclusive.
+ * @property fiscalYear - A fiscal year, which wins over from and to.
+ */
+interface IRangeRequest {
+  from?: string;
+  to?: string;
+  fiscalYear?: number;
+}
 
 /**
  * One cached answer.
@@ -47,6 +66,7 @@ export class ReportsService {
   constructor(
     private readonly reportsRepository: ReportsRepository,
     private readonly dataVersionService: DataVersionService,
+    private readonly usersService: UsersService,
   ) {}
 
   /**
@@ -67,10 +87,9 @@ export class ReportsService {
    * @throws BadRequestException When `to` is before `from`.
    */
   async planVsActual(userId: Types.ObjectId, query: ReportQueryDTO): Promise<ReportResponseDTO> {
-    this.assertRangeOrdered(query.from, query.to);
-
+    const { from, to } = await this.resolveRange(userId, query);
     const policy = query.missingActuals ?? MissingActualPolicyEnum.ZERO;
-    const cacheKey = this.buildKey(userId, 'report', query, policy);
+    const cacheKey = this.buildKey(userId, 'report', { ...query, from, to }, policy);
     const cached = this.readCache<ReportResponseDTO>(cacheKey);
 
     if (cached !== null) {
@@ -80,8 +99,8 @@ export class ReportsService {
     const categoryIds = (query.categoryIds ?? []).map((id: string) => new Types.ObjectId(id));
     const { cells, totals, total } = await this.reportsRepository.aggregate(
       userId,
-      query.from,
-      query.to,
+      from,
+      to,
       categoryIds,
       query.limit,
       query.offset,
@@ -107,10 +126,9 @@ export class ReportsService {
    * @throws BadRequestException When `to` is before `from`.
    */
   async series(userId: Types.ObjectId, query: SeriesQueryDTO): Promise<SeriesResponseDTO> {
-    this.assertRangeOrdered(query.from, query.to);
-
+    const { from, to } = await this.resolveRange(userId, query);
     const groupBy = query.groupBy ?? SeriesGroupByEnum.MONTH;
-    const cacheKey = this.buildKey(userId, `series:${groupBy}`, query, MissingActualPolicyEnum.ZERO);
+    const cacheKey = this.buildKey(userId, `series:${groupBy}`, { ...query, from, to }, MissingActualPolicyEnum.ZERO);
     const cached = this.readCache<SeriesResponseDTO>(cacheKey);
 
     if (cached !== null) {
@@ -118,7 +136,7 @@ export class ReportsService {
     }
 
     const categoryIds = (query.categoryIds ?? []).map((id: string) => new Types.ObjectId(id));
-    const points = await this.reportsRepository.series(userId, query.from, query.to, categoryIds, groupBy);
+    const points = await this.reportsRepository.series(userId, from, to, categoryIds, groupBy);
 
     const response: SeriesResponseDTO = {
       groupBy,
@@ -151,11 +169,14 @@ export class ReportsService {
    * @throws BadRequestException When `to` is before `from`.
    */
   async exportCsv(userId: Types.ObjectId, query: ReportQueryDTO): Promise<{ csv: string; filename: string }> {
-    const report = await this.planVsActual(userId, { ...query, limit: MAX_EXPORT_ROWS, offset: 0 });
+    const { from, to } = await this.resolveRange(userId, query);
+    const report = await this.planVsActual(userId, { ...query, from, to, limit: MAX_EXPORT_ROWS, offset: 0 });
 
     return {
       csv: renderReportCsv(report.items, report.totals),
-      filename: `plan-vs-actual-${query.from}-to-${query.to}.csv`,
+      // Named from the resolved range, so a fiscal year download says which
+      // months it actually covers rather than repeating the year number.
+      filename: `plan-vs-actual-${from}-to-${to}.csv`,
     };
   }
 
@@ -211,21 +232,52 @@ export class ReportsService {
   }
 
   /**
-   * Rejects a range that runs backwards.
+   * Works out which months the report covers.
    *
    * @remarks
-   * A `$gte`/`$lte` pair with the bounds swapped matches nothing, so the report
-   * would come back empty and read as an account with no data rather than as a
-   * mistyped request.
+   * A fiscal year is resolved here rather than by the client, because the start
+   * month lives on the account and only the server knows it. With a start month
+   * of 4, `fiscalYear=2026` is 2026-04 through 2027-03.
    *
-   * @param from - First month of the range.
-   * @param to - Last month of the range.
-   * @throws BadRequestException When `to` is before `from`.
+   * The resolved months, not the fiscal year, go into the cache key. That means
+   * changing the account's fiscal year start needs no cache invalidation at all:
+   * the same request simply resolves to a different range and therefore a
+   * different key.
+   *
+   * @steps
+   * 1. Resolve a fiscal year against the account's start month when one is given.
+   *    It wins over `from` and `to`, so a request carrying both has one meaning.
+   * 2. Otherwise require both ends. A report over an unbounded range is a scan
+   *    that grows with the account's history, and a client that forgot the range
+   *    would get one silently.
+   * 3. Reject a range that runs backwards, which would match nothing and read as
+   *    an account with no data rather than as a mistyped request.
+   *
+   * @param userId - The authenticated caller.
+   * @param query - The request.
+   * @returns The first and last month, inclusive.
+   * @throws BadRequestException When neither form is supplied, or the range runs backwards.
    */
-  private assertRangeOrdered(from: string, to: string): void {
-    if (compareMonths(from, to) > 0) {
-      throw new BadRequestException(`The range ends before it starts: from ${from} is after to ${to}.`);
+  private async resolveRange(userId: Types.ObjectId, query: IRangeRequest): Promise<{ from: string; to: string }> {
+    if (query.fiscalYear !== undefined) {
+      const user = await this.usersService.findById(userId);
+
+      if (user === null) {
+        throw new BadRequestException('Account not found.');
+      }
+
+      return fiscalYearRange(query.fiscalYear, user.fiscalYearStartMonth);
     }
+
+    if (query.from === undefined || query.to === undefined) {
+      throw new BadRequestException('Supply either from and to, or a fiscalYear.');
+    }
+
+    if (compareMonths(query.from, query.to) > 0) {
+      throw new BadRequestException(`The range ends before it starts: from ${query.from} is after to ${query.to}.`);
+    }
+
+    return { from: query.from, to: query.to };
   }
 
   /**

@@ -56,3 +56,15 @@ export const CSV_COLUMNS = ['Category', 'Month', 'Plan', 'Actual', 'Variance', '
 
 /** The label on the appended totals row. */
 export const CSV_TOTALS_LABEL = 'Total';
+
+/**
+ * The earliest fiscal year a report will resolve.
+ *
+ * @remarks
+ * Bounds rather than business rules. A typo turning 2026 into 20260 would
+ * otherwise resolve to a range no index can help with and no user meant.
+ */
+export const MIN_FISCAL_YEAR = 1970;
+
+/** The latest fiscal year a report will resolve. */
+export const MAX_FISCAL_YEAR = 2999;
