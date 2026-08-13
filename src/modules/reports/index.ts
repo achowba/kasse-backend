@@ -2,6 +2,7 @@ export * from './dto/report-query.dto';
 export * from './dto/report-response.dto';
 export * from './dto/series-query.dto';
 export * from './dto/series-response.dto';
+export * from './report-csv';
 export * from './reports.constants';
 export * from './reports.enums';
 export * from './reports.module';

@@ -397,6 +397,57 @@ describe('Reports (e2e)', () => {
     });
   });
 
+  describe('the CSV export', () => {
+    it('serves a downloadable file with the report in it', async () => {
+      const response = await request(server())
+        .get('/api/v1/reports/plan-vs-actual/export?from=2026-01&to=2026-02')
+        .set('Authorization', auth())
+        .expect(200);
+
+      expect(response.headers['content-type']).toContain('text/csv');
+      expect(response.headers['content-disposition']).toContain('attachment');
+      expect(response.headers['content-disposition']).toContain('plan-vs-actual-2026-01-to-2026-02.csv');
+    });
+
+    it('writes amounts a spreadsheet reads as numbers', async () => {
+      const response = await request(server())
+        .get('/api/v1/reports/plan-vs-actual/export?from=2026-01&to=2026-01')
+        .set('Authorization', auth())
+        .expect(200);
+      const rows = response.text
+        .trim()
+        .split('\n')
+        .map((line: string) => line.trim());
+
+      expect(rows[0]).toBe('Category,Month,Plan,Actual,Variance,Variance %');
+      expect(rows).toContain('Marketing,2026-01,5000.00,4800.00,-200.00,-4.00');
+    });
+
+    it('agrees with the JSON report it was built from', async () => {
+      const table = await readReport('from=2026-01&to=2026-02');
+      const response = await request(server())
+        .get('/api/v1/reports/plan-vs-actual/export?from=2026-01&to=2026-02')
+        .set('Authorization', auth())
+        .expect(200);
+      const rows = response.text.trim().split('\n');
+
+      // Header, one line per row, and the totals line. Both come from the same
+      // call, so a mismatch means the export grew its own implementation.
+      expect(rows).toHaveLength(table.items.length + 2);
+    });
+
+    it('rejects a backwards range like the other two endpoints', async () => {
+      await request(server())
+        .get('/api/v1/reports/plan-vs-actual/export?from=2026-06&to=2026-01')
+        .set('Authorization', auth())
+        .expect(400);
+    });
+
+    it('refuses an unauthenticated download', async () => {
+      await request(server()).get('/api/v1/reports/plan-vs-actual/export?from=2026-01&to=2026-02').expect(401);
+    });
+  });
+
   describe('cache invalidation', () => {
     it('reflects a new expense immediately rather than serving a cached report', async () => {
       const suppliesId = await createCategory('Supplies');

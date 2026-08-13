@@ -31,3 +31,28 @@ export const EXPENSES_COLLECTION = 'expenses';
 
 /** The collection the report resolves category names from. */
 export const CATEGORIES_COLLECTION = 'categories';
+
+/**
+ * The most rows an export renders.
+ *
+ * @remarks
+ * An export is unpaginated, because a spreadsheet of the first fifty rows is not
+ * the report. That makes the row count a memory bound, so it is capped. Forty
+ * categories over ten years is 4,800 rows, so this leaves room while keeping the
+ * response a file rather than a download.
+ */
+export const MAX_EXPORT_ROWS = 10_000;
+
+/**
+ * The export's column headers.
+ *
+ * @remarks
+ * Written for a person opening the file in a spreadsheet, so `Variance %` rather
+ * than `variancePercent`. The import reads a different, narrower shape and does
+ * not consume this file: exporting a report and re-importing it would mean
+ * importing computed columns, which is not a thing that can be done.
+ */
+export const CSV_COLUMNS = ['Category', 'Month', 'Plan', 'Actual', 'Variance', 'Variance %'] as const;
+
+/** The label on the appended totals row. */
+export const CSV_TOTALS_LABEL = 'Total';
