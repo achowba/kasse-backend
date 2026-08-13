@@ -37,6 +37,7 @@ The API is client agnostic. It speaks JSON over REST, carries sessions in the `A
 |---|---|
 | Project scaffold, strict TypeScript, lint, CI | Done |
 | Conventions, commit tooling, agent index | Done |
+| Container image and compose stack | Done |
 | PR template and agent skills | Not started |
 | Platform layer: config, logging, errors, docs, health | Not started |
 | Core domain: months, money, variance, pagination | Not started |
@@ -153,7 +154,7 @@ npm run start:dev
 | `NODE_ENV` | Runtime mode. Controls log format and error detail. | `development` | No, defaults to `development` |
 | `PORT` | HTTP port. | `3000` | No, defaults to `3000` |
 | `LOG_LEVEL` | Pino log level. | `debug` | No, defaults to `info` |
-| `MONGODB_URI` | Connection string. Must point at a replica set, because the CSV import writes in a transaction. | `mongodb://localhost:27017/plan_vs_actual?replicaSet=rs0` | Yes |
+| `MONGODB_URI` | Connection string. The server must be a replica set member, because the CSV import writes in a transaction. | `mongodb://localhost:27017/plan_vs_actual?directConnection=true` | Yes |
 | `JWT_ACCESS_SECRET` | Signing secret for access tokens. | Output of `openssl rand -base64 48` | Yes |
 | `JWT_ACCESS_TTL` | Access token lifetime. | `15m` | No, defaults to `15m` |
 | `JWT_REFRESH_SECRET` | Signing secret for refresh tokens. Must differ from the access secret. | Output of `openssl rand -base64 48` | Yes |
@@ -242,7 +243,8 @@ End to end tests cover the three behaviours the assignment names: the report's n
 ├── .agents/skills/              Repeatable workflows for PR docs, review, tests
 ├── .github/workflows/ci.yml     Format, lint, typecheck, test, build on every PR
 ├── .husky/commit-msg            Runs commitlint on every commit message
-├── docker-compose.yml           Local MongoDB as a single node replica set
+├── Dockerfile                   Three stage build, unprivileged runtime image
+├── docker-compose.yml           Local MongoDB, plus the API behind a profile
 ├── openapi.json                 Generated API contract, consumed by the web client
 ├── src/
 │   ├── main.ts                  Bootstrap
@@ -257,9 +259,16 @@ This is the layout the project targets. The [implementation status](#implementat
 
 ## Deployment
 
-The service builds to a container and runs behind HTTPS with MongoDB Atlas as the database. Secrets come from the platform's secret store, never from a committed file.
+The service ships as a container. `Dockerfile` is a three stage build: the first stage compiles TypeScript with the dev dependencies, the second resolves production dependencies from the same lockfile, and the runtime stage carries only `node_modules`, the compiled `dist/`, and `package.json`. It runs as the unprivileged `node` user, declares a TCP liveness check, and relies on Docker's init to forward `SIGTERM` for a clean shutdown.
 
-Notes on operating it are added with the deployment configuration.
+```bash
+docker build -t plan-vs-actual-api:local .    # image only
+docker compose --profile app up -d --build    # database and API together
+```
+
+CI builds the same image on every pull request, so a broken Dockerfile fails before a deploy does.
+
+A deployed environment takes its secrets from the platform's secret store, never from a committed file, and points `MONGODB_URI` at MongoDB Atlas over TLS.
 
 ## Assumptions and tradeoffs
 

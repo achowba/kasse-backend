@@ -1,0 +1,34 @@
+# Installed fresh from the lockfile inside the image.
+node_modules
+dist
+coverage
+
+# Never copy a secret into a layer.
+.env
+.env.*
+!.env.example
+
+# Not needed to build or run the service.
+.git
+.github
+.husky
+.agents
+.vscode
+.idea
+artifacts
+.artifacts
+.remember
+AGENTS.md
+CLAUDE.md
+CLAUDE.local.md
+*.md
+!README.md
+.gitmessage
+commitlint.config.mjs
+eslint.config.mjs
+.prettierrc
+mise.toml
+.nvmrc
+docker-compose.yml
+Dockerfile
+test

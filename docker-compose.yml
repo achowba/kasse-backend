@@ -1,8 +1,10 @@
-# Local MongoDB for development and manual testing.
+# Local development stack.
 #
-# The server runs as a single node replica set because the CSV import writes all
-# rows in one transaction, and MongoDB transactions require a replica set. The
-# healthcheck initiates the set on its first run, so no manual step is needed.
+#   docker compose up -d                  database only, for `npm run start:dev`
+#   docker compose --profile app up -d    database and the API in containers
+#
+# The API sits behind a profile so the common case, wanting only a database,
+# does not rebuild the image every time.
 services:
   mongo:
     image: mongo:8
@@ -14,6 +16,9 @@ services:
     volumes:
       - mongo-data:/data/db
     healthcheck:
+      # Initiates the replica set on the first run. The server must be a replica
+      # set member because the CSV import writes every row in one transaction,
+      # and transactions require one.
       test: >
         mongosh --quiet --eval "
           try { rs.status().ok }
@@ -25,6 +30,29 @@ services:
       timeout: 10s
       retries: 30
       start_period: 10s
+
+  api:
+    profiles: ['app']
+    build:
+      context: .
+      target: runtime
+    container_name: pva-api
+    restart: unless-stopped
+    # Node is PID 1 here, so let Docker supply an init that reaps children and
+    # forwards SIGTERM for a clean shutdown.
+    init: true
+    env_file: .env
+    environment:
+      # Overrides the host oriented value in .env. `directConnection=true` skips
+      # replica set discovery, which matters because the set advertises itself
+      # as localhost:27017 and that address means nothing inside this container.
+      MONGODB_URI: mongodb://mongo:27017/plan_vs_actual?directConnection=true
+      PORT: 3000
+    ports:
+      - '3000:3000'
+    depends_on:
+      mongo:
+        condition: service_healthy
 
 volumes:
   mongo-data:
