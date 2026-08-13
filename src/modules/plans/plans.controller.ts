@@ -14,7 +14,7 @@ import { Types } from 'mongoose';
 import { CurrentUser, type IAuthenticatedUser } from '@common/auth';
 import { ApiVersionEnum } from '@common/enums';
 import { ErrorResponseDTO } from '@common/errors';
-import { IPaginatedResponse } from '@common/pagination';
+import { ApiPaginatedResponse, IPaginatedResponse } from '@common/pagination';
 import { ParseObjectIdPipe } from '@common/pipes';
 import { RequestId } from '@common/request-context';
 import { ListPlansQueryDTO } from './dto/list-plans.query.dto';
@@ -48,7 +48,7 @@ export class PlansController {
 
 Each row carries the category id rather than its name. Resolving names here would mean a lookup per row, and a client listing targets already holds the category list it built its picker from. The report endpoint does include names, because there the join happens once inside the aggregation.`,
   })
-  @ApiOkResponse({ description: 'A page of targets.', type: [PlanResponseDTO] })
+  @ApiPaginatedResponse(PlanResponseDTO, 'A page of targets.')
   async list(
     @CurrentUser() user: IAuthenticatedUser,
     @Query() query: ListPlansQueryDTO,
