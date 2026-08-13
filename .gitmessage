@@ -1,0 +1,20 @@
+# <type>(<scope>): <subject>
+#
+# Conventional Commits. A scope is required (house rule); never omit it.
+# Allowed types:
+#   feat, fix, docs, style, refactor, test, chore, perf, ci, build, revert
+# Scope: the module or area touched. For this repo:
+#   plans, actuals, reports, auth, categories, locks, imports, audit, nl-query,
+#   platform, scaffold, docker, seed.
+# For cross-cutting work use: repo, deps, ci, config, docs.
+#
+# Examples:
+#   feat(locks): reject edits to a locked month with 423
+#   fix(reports): return null for variance percent when the plan is zero
+#   docs(readme): document the missing actual policy
+#
+# Subject: imperative mood, lowercase, no trailing period; header under 100 chars.
+# Body (optional): leave a blank line, then explain what changed and why; wrap at 100.
+# Footer (optional): BREAKING CHANGE: <description>, or Refs: <id>.
+#
+# commitlint enforces this format via the Husky commit-msg hook.
