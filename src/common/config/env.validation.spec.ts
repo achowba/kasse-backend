@@ -20,6 +20,7 @@ const VALID_ENV = {
   MONGODB_URI: 'mongodb://localhost:27017/pva?directConnection=true',
   JWT_PRIVATE_KEY: fakeKey('PRIVATE KEY'),
   JWT_PUBLIC_KEY: fakeKey('PUBLIC KEY'),
+  TOKEN_ISSUER: 'kasse-api',
 };
 
 describe('validateEnvironment', () => {
@@ -89,6 +90,25 @@ describe('validateEnvironment', () => {
 
     it('rejects an access token lifetime short enough that clock skew alone would break it', () => {
       expect(() => validateEnvironment({ ...VALID_ENV, JWT_ACCESS_TTL_SECONDS: '30' })).toThrow(/JWT_ACCESS_TTL_SECONDS/);
+    });
+  });
+
+  describe('the token issuer', () => {
+    it('is required, because signing and verification must agree', () => {
+      const { TOKEN_ISSUER: _omitted, ...withoutIssuer } = VALID_ENV;
+
+      // Defaulting it would let one instance sign with the fallback and another
+      // with a configured value, and the symptom is a 401 that reads like an
+      // authentication bug rather than a configuration one.
+      expect(() => validateEnvironment(withoutIssuer)).toThrow(/TOKEN_ISSUER/);
+    });
+
+    it('is rejected when empty rather than treated as absent', () => {
+      expect(() => validateEnvironment({ ...VALID_ENV, TOKEN_ISSUER: '' })).toThrow(/TOKEN_ISSUER/);
+    });
+
+    it('accepts a per environment name', () => {
+      expect(() => validateEnvironment({ ...VALID_ENV, TOKEN_ISSUER: 'kasse-api-staging' })).not.toThrow();
     });
   });
 

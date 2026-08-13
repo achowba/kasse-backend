@@ -7,7 +7,6 @@ import { PassportModule } from '@nestjs/passport';
 import { IAuthConfig } from '@common/config';
 import { AuditLogModule } from '@modules/audit-log';
 import { UsersModule } from '@modules/users';
-import { TOKEN_ISSUER } from './auth.constants';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -44,8 +43,8 @@ import { TokenService } from './token.service';
         return {
           privateKey: auth.privateKey,
           publicKey: auth.publicKey,
-          signOptions: { algorithm: auth.algorithm, expiresIn: auth.accessTtlSeconds, issuer: TOKEN_ISSUER },
-          verifyOptions: { algorithms: [auth.algorithm], issuer: TOKEN_ISSUER },
+          signOptions: { algorithm: auth.algorithm, expiresIn: auth.accessTtlSeconds, issuer: auth.issuer },
+          verifyOptions: { algorithms: [auth.algorithm], issuer: auth.issuer },
         };
       },
     }),
