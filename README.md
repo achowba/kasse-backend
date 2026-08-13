@@ -38,7 +38,7 @@ The API is client agnostic. It speaks JSON over REST, carries sessions in the `A
 | Project scaffold, strict TypeScript, lint, CI | Done |
 | Conventions, commit tooling, agent index | Done |
 | Container image and compose stack | Done |
-| PR template and agent skills | Not started |
+| PR template and agent skills | Done |
 | Platform layer: config, logging, errors, docs, health | Not started |
 | Core domain: months, money, variance, pagination | Not started |
 | Auth and sessions | Not started |
