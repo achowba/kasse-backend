@@ -30,6 +30,13 @@ const globalSetup = async (): Promise<void> => {
   process.env['THROTTLE_LIMIT'] = '100000';
   process.env['AUTH_THROTTLE_LIMIT'] = '100000';
 
+  // The report and import routes carry tighter limits than the global one, and
+  // the suite exercises both well past them. Raised here for the same reason as
+  // the others: these tests are about the report and the import, not about the
+  // throttler, which has its own.
+  process.env['REPORT_THROTTLE_LIMIT'] = '100000';
+  process.env['IMPORT_THROTTLE_LIMIT'] = '100000';
+
   // A keypair per run, generated here for the same reason the database is: the
   // suite should bring everything it needs rather than borrowing it from whoever
   // happens to be running it.
