@@ -2,7 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # `production` is what gets deployed, so the gate has to run on it. Branch
+    # protection would be the stronger answer, but it needs a public repository
+    # or a paid plan, and neither is true yet. This does not stop a bad commit
+    # reaching the branch; it makes one visible immediately rather than after a
+    # deployment has already gone out.
+    branches: [main, production]
   pull_request:
 
 jobs:
