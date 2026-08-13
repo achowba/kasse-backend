@@ -89,6 +89,34 @@ export class EnvironmentVariables {
   @IsInt()
   @Min(1)
   AUTH_THROTTLE_TTL_MS?: number;
+
+  /*
+   * Read directly from `process.env` in `@common/throttling`, because `@Throttle`
+   * is a decorator and its values are needed when the class is defined, before
+   * any injector exists. Declared here anyway.
+   *
+   * Without these three, `Number('six')` produced `NaN`, the throttler compared
+   * every count against it, and every comparison was false. The limit was not
+   * merely wrong, it was absent, and the boot said nothing. That is the one place
+   * the rule the rest of this file exists to uphold did not hold.
+   *
+   * Declaring them does not change where the constants read from. It makes a
+   * malformed value stop the process, which is the guarantee that matters.
+   */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  REPORT_THROTTLE_LIMIT?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  IMPORT_THROTTLE_LIMIT?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  EXPENSIVE_THROTTLE_TTL_MS?: number;
 }
 
 /**
