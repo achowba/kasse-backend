@@ -1882,6 +1882,233 @@
         ]
       }
     },
+    "/api/v1/imports/expenses": {
+      "post": {
+        "description": "Reads a CSV of expenses and writes them all, or writes none of them.\n\n**Columns.** `category`, `month`, and `amount` are required; `note` is optional. Header matching ignores case and surrounding spaces, and extra columns are ignored rather than rejected, because a file exported from an accounting system carries plenty this import has no use for.\n\n```csv\ncategory,month,amount,note\nMarketing,2026-01,4800.00,Q1 campaign\nPayroll,2026-01,20500.00\n```\n\n**Amounts** are written the way a person writes them, not in minor units. They are parsed digit by digit rather than through floating point, so `4800.10` stores exactly 480010 and never 480009.\n\n**Fail closed.** Every row is validated, every category resolved, and every month checked against the period locks before anything is written. If one row is wrong, nothing is written and the response lists every problem with its line number. This matters more than it sounds: an import that wrote the good rows and stopped could not simply be re-uploaded after a fix, because that would double the rows that did land.\n\n**Idempotent.** `Idempotency-Key` is required. Sending the same key again returns the original batch without importing anything, so a client that retries after a timeout does not double a month's spend.\n\n**Limits.** 10,000 rows and 5 MB. Past that the right answer is a background job rather than a longer request.",
+        "operationId": "ImportsController_importExpenses_v1",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A key the client generates for this upload, such as a UUID. Sending the same key again returns the original result instead of importing a second time.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "5f2a4c6e-9b1d-4d3a-8f7c-2e1b0a9d8c7b"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "A CSV file."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The import committed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportBatchResponseDTO"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The file is missing a required column, has no rows, is too large, or is not readable as CSV.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "At least one row was rejected. Nothing was written. `details.errors` carries the line numbers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The month is closed. The response carries the month in `details`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Import expenses from a CSV",
+        "tags": [
+          "Imports"
+        ]
+      }
+    },
+    "/api/v1/imports": {
+      "get": {
+        "description": "Every import this account has attempted, newest first, successful or not.\n\nA failed import is kept deliberately. Without the record, a user whose upload was rejected has only the HTTP response, which they have already closed by the time they ask what went wrong.",
+        "operationId": "ImportsController_list_v1",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "How many records to return.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "description": "How many records to skip.",
+            "schema": {
+              "minimum": 0,
+              "default": 0,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of imports.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ImportBatchResponseDTO"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List imports",
+        "tags": [
+          "Imports"
+        ]
+      }
+    },
+    "/api/v1/imports/{batchId}": {
+      "get": {
+        "description": "The outcome of a single import, including the per row errors when it failed.\n\nTo see what a successful import actually wrote, list expenses filtered by this batch: `GET /expenses?importBatchId=...`.",
+        "operationId": "ImportsController_getById_v1",
+        "parameters": [
+          {
+            "name": "batchId",
+            "required": true,
+            "in": "path",
+            "description": "Identifier from the import list.",
+            "schema": {
+              "example": "65f1c2d3e4b5a6c7d8e9f0d1",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ObjectId"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The import.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportBatchResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The caller has no import with that id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read one import",
+        "tags": [
+          "Imports"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "description": "Answers whether the process is running. Checks no dependency.",
@@ -3093,6 +3320,93 @@
         "required": [
           "groupBy",
           "points"
+        ]
+      },
+      "ImportRowErrorDTO": {
+        "type": "object",
+        "properties": {
+          "line": {
+            "type": "number",
+            "description": "The line in the uploaded file. The header is line 1.",
+            "example": 7
+          },
+          "column": {
+            "type": "object",
+            "description": "Which column was wrong.",
+            "example": "month",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "description": "What was wrong.",
+            "example": "\"2026-13\" is not a month in YYYY-MM format."
+          }
+        },
+        "required": [
+          "line",
+          "column",
+          "message"
+        ]
+      },
+      "ImportBatchResponseDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identifier of the batch.",
+            "example": "65f1c2d3e4b5a6c7d8e9f0d1"
+          },
+          "filename": {
+            "type": "string",
+            "description": "The file that was uploaded.",
+            "example": "january-expenses.csv"
+          },
+          "status": {
+            "type": "string",
+            "description": "Whether the rows were written.",
+            "enum": [
+              "COMPLETED",
+              "FAILED"
+            ]
+          },
+          "rowCount": {
+            "type": "number",
+            "description": "How many data rows the file carried.",
+            "example": 120
+          },
+          "errorCount": {
+            "type": "number",
+            "description": "How many rows were rejected.",
+            "example": 0
+          },
+          "expenseCount": {
+            "type": "number",
+            "description": "How many expenses this batch wrote. Zero when it failed.",
+            "example": 120
+          },
+          "errors": {
+            "description": "The rejected rows, in file order.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportRowErrorDTO"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was uploaded.",
+            "example": "2026-01-15T10:04:11.212Z",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "status",
+          "rowCount",
+          "errorCount",
+          "expenseCount",
+          "errors",
+          "createdAt"
         ]
       }
     }

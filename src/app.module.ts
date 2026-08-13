@@ -12,6 +12,7 @@ import { AuthModule } from '@modules/auth';
 import { CategoriesModule } from '@modules/categories';
 import { ExpensesModule } from '@modules/expenses';
 import { HealthModule } from '@modules/health';
+import { ImportsModule } from '@modules/imports';
 import { PeriodLocksModule } from '@modules/period-locks';
 import { PlansModule } from '@modules/plans';
 import { ReportsModule } from '@modules/reports';
@@ -57,6 +58,7 @@ import { UsersModule } from '@modules/users';
     PlansModule,
     ExpensesModule,
     ReportsModule,
+    ImportsModule,
     HealthModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
