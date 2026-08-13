@@ -1,5 +1,5 @@
 import type Anthropic from '@anthropic-ai/sdk';
-import { MissingActualPolicyEnum } from '@common/money';
+import { MissingSpendPolicyEnum } from '@common/money';
 import { MONTH_PATTERN } from '@common/month';
 import { SeriesGroupByEnum } from '@modules/reports';
 import { NL_QUERY_TOOL_NAME } from './nl-query.constants';
@@ -25,7 +25,7 @@ import { NL_QUERY_TOOL_NAME } from './nl-query.constants';
 export const buildReportFilterTool = (categoryNames: string[]): Anthropic.Tool => ({
   name: NL_QUERY_TOOL_NAME,
   description:
-    'Build the filter for a plan against actual spending report. Call this once with the period and categories the question is about.',
+    'Build the filter for a plan against spend spending report. Call this once with the period and categories the question is about.',
   input_schema: {
     type: 'object' as const,
     properties: {
@@ -50,9 +50,9 @@ export const buildReportFilterTool = (categoryNames: string[]): Anthropic.Tool =
         enum: Object.values(SeriesGroupByEnum),
         description: 'Set only when the question asks for a trend or a chart rather than a table.',
       },
-      missingActuals: {
+      missingSpend: {
         type: 'string',
-        enum: Object.values(MissingActualPolicyEnum),
+        enum: Object.values(MissingSpendPolicyEnum),
         description:
           'Use "null" when the question distinguishes months with nothing logged, otherwise leave unset for the default.',
       },

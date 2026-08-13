@@ -1,7 +1,7 @@
 import { BadGatewayException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Types } from 'mongoose';
-import { MissingActualPolicyEnum } from '@common/money';
+import { MissingSpendPolicyEnum } from '@common/money';
 import { AuditActionEnum, AuditLogService } from '@modules/audit-log';
 import { CategoriesService } from '@modules/categories';
 import { ReportsService } from '@modules/reports';
@@ -48,7 +48,7 @@ const validArgs = { from: '2026-01', to: '2026-03', categories: ['Marketing'], i
 
 describe('NlQueryService', () => {
   const userId = new Types.ObjectId();
-  let reports: jest.Mocked<Pick<ReportsService, 'planVsActual'>>;
+  let reports: jest.Mocked<Pick<ReportsService, 'planVsSpend'>>;
   let categories: jest.Mocked<Pick<CategoriesService, 'list'>>;
   let auditLog: jest.Mocked<Pick<AuditLogService, 'record'>>;
 
@@ -74,9 +74,9 @@ describe('NlQueryService', () => {
     create.mockResolvedValue(toolReply(validArgs));
 
     reports = {
-      planVsActual: jest.fn().mockResolvedValue({
+      planVsSpend: jest.fn().mockResolvedValue({
         items: [],
-        totals: { planMinor: 0, actualMinor: 0, varianceMinor: 0, variancePercent: null },
+        totals: { planMinor: 0, spentMinor: 0, varianceMinor: 0, variancePercent: null },
         pagination: { limit: 200, offset: 0, total: 0 },
       }),
     };
@@ -110,7 +110,7 @@ describe('NlQueryService', () => {
     it('runs the report the model described', async () => {
       await build('a-key').ask(userId, 'How did marketing do in Q1 2026?');
 
-      expect(reports.planVsActual).toHaveBeenCalledWith(userId, expect.objectContaining({ from: '2026-01', to: '2026-03' }));
+      expect(reports.planVsSpend).toHaveBeenCalledWith(userId, expect.objectContaining({ from: '2026-01', to: '2026-03' }));
     });
 
     it('returns the interpretation alongside the data', async () => {
@@ -158,7 +158,7 @@ describe('NlQueryService', () => {
       create.mockResolvedValue(toolReply({ ...validArgs, from: 'last January' }));
 
       await expect(build('a-key').ask(userId, 'anything')).rejects.toBeInstanceOf(BadGatewayException);
-      expect(reports.planVsActual).not.toHaveBeenCalled();
+      expect(reports.planVsSpend).not.toHaveBeenCalled();
     });
 
     it('rejects a missing month', async () => {
@@ -187,24 +187,24 @@ describe('NlQueryService', () => {
 
       // Nothing extra survives into the report request. This is the property the
       // whole design rests on: the model's output is input, not instructions.
-      expect(reports.planVsActual).toHaveBeenCalledWith(
+      expect(reports.planVsSpend).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({ from: '2026-01', to: '2026-03', limit: 200, offset: 0 }),
       );
       expect(answer.filter).not.toHaveProperty('$where');
     });
 
-    it('accepts a valid missing actual policy', async () => {
-      create.mockResolvedValue(toolReply({ ...validArgs, missingActuals: MissingActualPolicyEnum.NULL }));
+    it('accepts a valid missing spend policy', async () => {
+      create.mockResolvedValue(toolReply({ ...validArgs, missingSpend: MissingSpendPolicyEnum.NULL }));
 
       const answer = await build('a-key').ask(userId, 'anything');
 
-      expect(answer.filter.missingActuals).toBe(MissingActualPolicyEnum.NULL);
+      expect(answer.filter.missingSpend).toBe(MissingSpendPolicyEnum.NULL);
     });
 
     it('rejects an invalid policy rather than falling back silently', async () => {
       jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-      create.mockResolvedValue(toolReply({ ...validArgs, missingActuals: 'whatever' }));
+      create.mockResolvedValue(toolReply({ ...validArgs, missingSpend: 'whatever' }));
 
       await expect(build('a-key').ask(userId, 'anything')).rejects.toBeInstanceOf(BadGatewayException);
     });

@@ -1,6 +1,6 @@
-# Plan vs Actual API
+# Kasse API
 
-Backend API for tracking monthly spending targets against actual spend, with variance reporting and locked accounting periods.
+Backend API for tracking monthly spending targets against spend, with variance reporting and locked accounting periods.
 
 ## Table of contents
 
@@ -11,7 +11,7 @@ Backend API for tracking monthly spending targets against actual spend, with var
 - [Product rules](#product-rules)
   - [Money and months](#money-and-months)
   - [Variance](#variance)
-  - [Missing actuals](#missing-actuals)
+  - [Missing spend](#missing-spend)
   - [Deletion](#deletion)
   - [Locking](#locking)
 - [Prerequisites](#prerequisites)
@@ -64,7 +64,7 @@ The API is client agnostic. It speaks JSON over REST, carries sessions in the `A
 | Runtime | Node.js 22 LTS | Current LTS. Pinned in `.nvmrc` and `engines`. |
 | Language | TypeScript 5.7, `strict: true` | No implicit `any`, no unchecked index access. See `.agents/conventions/code-standards.convention.md`. |
 | Framework | NestJS 11 | Module boundaries, dependency injection, and first party support for validation, documentation, and health checks. |
-| Database | MongoDB 8 with Mongoose 9 | Document model fits sparse plan and actual grids. Aggregation does the report in one round trip. |
+| Database | MongoDB 8 with Mongoose 9 | Document model fits sparse plan and spend grids. Aggregation does the report in one round trip. |
 | Tests | Jest 30, Supertest, mongodb-memory-server | Unit tests beside their source, end to end tests against a real in process replica set. |
 | Docs | Swagger via `@nestjs/swagger` | Generated from the DTOs, exported to `openapi.json` for the web client. |
 
@@ -85,26 +85,26 @@ Two rules make the data safe rather than relying on discipline in each handler:
 
 ### Money and months
 
-Money is stored as an integer count of minor units, never as a floating point number. A field named `planMinor` or `actualMinor` holds cents. One currency per user, defaulting to `USD`. Mixed currency accounts are out of scope.
+Money is stored as an integer count of minor units, never as a floating point number. A field named `planMinor` or `spentMinor` holds cents. One currency per user, defaulting to `USD`. Mixed currency accounts are out of scope.
 
 A month is the string `YYYY-MM`, for example `2026-01`. This sorts lexicographically, so a date range is a plain `$gte` and `$lte` comparison on an indexed field, and no timezone can shift a record into the wrong month.
 
 ### Variance
 
 ```
-variance     = actual - plan          (negative means under plan)
-variance %   = (actual - plan) / plan * 100
+variance     = spend - plan           (negative means under plan)
+variance %   = (spend - plan) / plan * 100
 ```
 
 When the plan is `0` the percentage is undefined. The API returns `null` for it, never `NaN` and never `Infinity`. Clients render `null` as `N/A`. The absolute variance is still returned, because it is well defined.
 
 Percentages are rounded to two decimal places.
 
-### Missing actuals
+### Missing spend
 
-When a category has a plan for a month but nothing logged against it, the report's default is to treat the actual as `0`, which makes the variance the full negative of the plan. Pass `?missingActuals=null` to get `null` for the actual, the variance, and the percentage instead, so the client can render a dash.
+When a category has a plan for a month but nothing logged against it, the report's default is to treat the spend as `0`, which makes the variance the full negative of the plan. Pass `?missingSpend=null` to get `null` for the spend, the variance, and the percentage instead, so the client can render a dash.
 
-Either way the response carries `hasActual`, so a real logged `0` is never confused with nothing logged.
+Either way the response carries `hasSpend`, so a real logged `0` is never confused with nothing logged.
 
 ### Deletion
 
@@ -134,7 +134,7 @@ Locking is reversible. Unlocking is recorded in the audit log along with every o
 
 ```bash
 git clone <repository-url>
-cd plan-vs-actual-tracker
+cd kasse
 mise install                          # or: nvm use
 npm install                           # also installs the git hooks via husky
 git config commit.template .gitmessage
@@ -164,7 +164,7 @@ npm run start:dev
 | `NODE_ENV` | Runtime mode. Controls log format and error detail. | `development` | No, defaults to `development` |
 | `PORT` | HTTP port. | `1413` | No, defaults to `1413` |
 | `LOG_LEVEL` | Pino log level. | `debug` | No, defaults to `info` |
-| `MONGODB_URI` | Connection string. The server must be a replica set member, because the CSV import writes in a transaction. | `mongodb://localhost:27017/plan_vs_actual?directConnection=true` | Yes |
+| `MONGODB_URI` | Connection string. The server must be a replica set member, because the CSV import writes in a transaction. | `mongodb://localhost:27017/kasse?directConnection=true` | Yes |
 | `JWT_ACCESS_SECRET` | Signing secret for access tokens. | Output of `openssl rand -base64 48` | Yes |
 | `JWT_ACCESS_TTL` | Access token lifetime. | `15m` | No, defaults to `15m` |
 | `JWT_REFRESH_SECRET` | Signing secret for refresh tokens. Must differ from the access secret. | Output of `openssl rand -base64 48` | Yes |
@@ -183,7 +183,7 @@ Two seeders will be available:
 | Command | What it inserts |
 |---|---|
 | `npm run seed:spec` | The exact sample data from the assignment, used by the end to end test that asserts the report's numbers. |
-| `npm run seed:demo` | A catalogue of 40 categories and a demo user with 100 expenses across 12 months, mixing over plan, under plan, on plan, missing actuals, unplanned spend, and a locked quarter. |
+| `npm run seed:demo` | A catalogue of 40 categories and a demo user with 100 expenses across 12 months, mixing over plan, under plan, on plan, missing spends, unplanned spend, and a locked quarter. |
 
 Both are deterministic. Neither uses unseeded randomness, so test expectations stay stable.
 
@@ -248,7 +248,7 @@ npm run lint       # eslint, no autofix
 npm run typecheck  # tsc --noEmit
 ```
 
-Unit tests sit beside their source as `{name}.spec.ts` and mock external dependencies, including Mongoose models. Each service and utility covers the happy path, validation failures, and edge cases such as an empty range, a plan of zero, an absent actual, and malformed CSV rows.
+Unit tests sit beside their source as `{name}.spec.ts` and mock external dependencies, including Mongoose models. Each service and utility covers the happy path, validation failures, and edge cases such as an empty range, a plan of zero, absent spend, and malformed CSV rows.
 
 End to end tests run against a real MongoDB. A Jest `globalSetup` starts one in-memory replica set for the whole run and puts its connection string in the environment before any test file loads, which matters because the application validates its configuration at import time. They will cover the three behaviours the assignment names: the report's numbers match the stored sample data, a locked month rejects edits, and CSV import validates and replays idempotently.
 
@@ -280,7 +280,7 @@ This is the layout the project targets. The [implementation status](#implementat
 The service ships as a container. `Dockerfile` is a three stage build: the first stage compiles TypeScript with the dev dependencies, the second resolves production dependencies from the same lockfile, and the runtime stage carries only `node_modules`, the compiled `dist/`, and `package.json`. It runs as the unprivileged `node` user, declares a TCP liveness check, and relies on Docker's init to forward `SIGTERM` for a clean shutdown.
 
 ```bash
-docker build -t plan-vs-actual-api:local .    # image only
+docker build -t kasse-api:local .    # image only
 docker compose --profile app up -d --build    # database and API together
 ```
 

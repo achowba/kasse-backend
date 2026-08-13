@@ -6,11 +6,11 @@ Money actually spent: the side of the report a plan is measured against.
 
 This is the opposite of a plan, and the difference is the reason the two modules are not symmetrical.
 
-A plan is one target per category and month, enforced by a unique index. An expense is one line item, and a month's spend on a category is however many of them there were. The report sums them into the figure it calls the **actual**.
+A plan is one target per category and month, enforced by a unique index. An expense is one line item, and a month's spend on a category is however many of them there were. The report sums them into the figure it calls **spend**.
 
 There is deliberately no uniqueness rule and no upsert here. Collapsing to one record per category and month would force a client to read the current total, add to it, and write it back, which loses an entry whenever two people log at once. Appending a row has no such race.
 
-That is also why the vocabulary splits: **expenses** are the records a user creates, **actual** is the figure they sum to. Only the report uses the second word.
+That is also why the vocabulary splits: **expenses** are the records a user creates, **spend** is the figure they sum to. Only the report uses the second word.
 
 ## Correcting an expense can move it between periods
 

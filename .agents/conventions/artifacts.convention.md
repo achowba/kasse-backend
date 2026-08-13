@@ -17,7 +17,7 @@ artifacts/<category>/<descriptor>_<YYYYMMDDHHMMSS>.<type>.md
 
 | Path | Holds | Example |
 |---|---|---|
-| `artifacts/plans/` | Implementation plans, written before the code they describe | `plan_vs_actual_backend_20260812171645.plan.md` |
+| `artifacts/plans/` | Implementation plans, written before the code they describe | `kasse_backend_20260812171645.plan.md` |
 | `artifacts/pr/reviews/` | Review output from the `pr-patrol` skill | `feat_reports_20260812184500.review.md` |
 | `artifacts/pr/labels/` | Cached repository labels. A cache keyed by `lastSyncedAt`, so it is exempt from the naming pattern above | `index.json` |
 | `artifacts/notes/` | Research and scratch write ups | `mongo_index_tradeoffs_<TS>.notes.md` |

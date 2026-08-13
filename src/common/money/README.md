@@ -4,7 +4,7 @@ Money in minor units, and the variance calculation.
 
 ## What it does
 
-`parseAmountToMinor` reads an amount written by a person into an integer count of minor units. `formatMinorAsMajor` writes it back out. `calculateVariance` computes one cell of the plan against actual report.
+`parseAmountToMinor` reads an amount written by a person into an integer count of minor units. `formatMinorAsMajor` writes it back out. `calculateVariance` computes one cell of the plan against spend report.
 
 ## Why minor units, and why string parsing
 
@@ -21,13 +21,13 @@ Math.round(12.345 * 100)  // 1234, not 1235
 ## The variance rules
 
 ```
-variance   = actual - plan          negative means under plan
-variance % = (actual - plan) / plan * 100
+variance   = spend - plan           negative means under plan
+variance % = (spend - plan) / plan * 100
 ```
 
 - **A plan of zero** makes the percentage undefined. It returns `null`, never `NaN` and never `Infinity`. The absolute variance is still returned, because spending against no plan is real overspend and the number is meaningful.
-- **A missing actual** follows a policy. Under `ZERO`, the default, it counts as `0` and the variance is the whole plan. Under `NULL`, the actual, variance, and percent are all `null` so a client can render a dash.
-- **`hasActual` is always reported**, so a genuine logged `0` is never confused with nothing logged, whichever policy is in force.
+- **Missing spend** follows a policy. Under `ZERO`, the default, it counts as `0` and the variance is the whole plan. Under `NULL`, the spend, variance, and percent are all `null` so a client can render a dash.
+- **`hasSpend` is always reported**, so a genuine logged `0` is never confused with nothing logged, whichever policy is in force.
 - Percentages are rounded to two decimal places.
 
 `calculateVariance` is a pure function rather than an aggregation stage. It is exhaustively testable, and the table, the chart, and the CSV export all call it, so they cannot disagree with each other.

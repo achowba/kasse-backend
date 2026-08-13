@@ -18,7 +18,7 @@ import { Expense, ExpenseDocument } from './schemas/expense.schema';
  *
  * @remarks
  * An expense is one line item. The report sums a category's expenses for a month
- * into the figure it calls the actual. There is no upsert here for that reason:
+ * into the figure it calls spend. There is no upsert here for that reason:
  * collapsing to one record per category and month would force a read, add, and
  * write back, which loses an entry whenever two people log at once.
  *

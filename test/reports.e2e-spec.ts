@@ -12,22 +12,22 @@ import { bootstrapNestServer } from '../src/bootstrap';
  * @property categoryName - Its name, resolved by the aggregation.
  * @property month - The month.
  * @property planMinor - The target.
- * @property actualMinor - Logged spend, or null under the null policy.
- * @property varianceMinor - Actual minus plan.
+ * @property spentMinor - Logged spend, or null under the null policy.
+ * @property varianceMinor - Spend minus plan.
  * @property variancePercent - The variance as a percentage of the plan.
  * @property hasPlan - Whether a target exists.
- * @property hasActual - Whether anything was logged.
+ * @property hasSpend - Whether anything was logged.
  */
 interface IReportRow {
   categoryId: string;
   categoryName: string;
   month: string;
   planMinor: number;
-  actualMinor: number | null;
+  spentMinor: number | null;
   varianceMinor: number | null;
   variancePercent: number | null;
   hasPlan: boolean;
-  hasActual: boolean;
+  hasSpend: boolean;
 }
 
 /**
@@ -39,7 +39,7 @@ interface IReportRow {
  */
 interface IReportBody {
   items: IReportRow[];
-  totals: { planMinor: number; actualMinor: number; varianceMinor: number; variancePercent: number | null };
+  totals: { planMinor: number; spentMinor: number; varianceMinor: number; variancePercent: number | null };
   pagination: { limit: number; offset: number; total: number };
 }
 
@@ -112,7 +112,7 @@ describe('Reports (e2e)', () => {
    */
   const readReport = async (queryString: string): Promise<IReportBody> => {
     const response = await request(server())
-      .get(`/api/v1/reports/plan-vs-actual?${queryString}`)
+      .get(`/api/v1/reports/plan-vs-spend?${queryString}`)
       .set('Authorization', auth())
       .expect(200);
 
@@ -137,7 +137,7 @@ describe('Reports (e2e)', () => {
     payrollId = await createCategory('Payroll');
 
     // The published sample data. February marketing is planned and never spent,
-    // which is the case the missing actual policy exists for.
+    // which is the case the missing spend policy exists for.
     await setPlan(marketingId, '2026-01', 500_000);
     await setPlan(payrollId, '2026-01', 2_000_000);
     await setPlan(marketingId, '2026-02', 500_000);
@@ -174,11 +174,11 @@ describe('Reports (e2e)', () => {
     });
 
     it('renders the month with nothing logged as a dash under the null policy', async () => {
-      const report = await readReport('from=2026-02&to=2026-02&missingActuals=null');
+      const report = await readReport('from=2026-02&to=2026-02&missingSpend=null');
       const marketing = report.items.find((row: IReportRow) => row.categoryName === 'Marketing');
 
       expect(marketing).toEqual(
-        expect.objectContaining({ actualMinor: null, varianceMinor: null, variancePercent: null, hasActual: false }),
+        expect.objectContaining({ spentMinor: null, varianceMinor: null, variancePercent: null, hasSpend: false }),
       );
     });
   });
@@ -197,7 +197,7 @@ describe('Reports (e2e)', () => {
 
       // Three line items, one row. This is the difference from a plan, and it is
       // why logging spend twice is not an overwrite.
-      expect(software?.actualMinor).toBe(100_000);
+      expect(software?.spentMinor).toBe(100_000);
       expect(software?.varianceMinor).toBe(0);
       expect(software?.variancePercent).toBe(0);
     });
@@ -212,7 +212,7 @@ describe('Reports (e2e)', () => {
       const report = await readReport('from=2026-06&to=2026-06');
       const travel = report.items.find((row: IReportRow) => row.categoryName === 'Travel');
 
-      expect(travel?.actualMinor).toBe(200_000);
+      expect(travel?.spentMinor).toBe(200_000);
       expect(travel?.varianceMinor).toBe(0);
     });
   });
@@ -255,16 +255,16 @@ describe('Reports (e2e)', () => {
       await setPlan(trainingId, '2026-10', 50_000);
       await logExpense(trainingId, '2026-09', 0);
 
-      const report = await readReport('from=2026-09&to=2026-10&missingActuals=null');
+      const report = await readReport('from=2026-09&to=2026-10&missingSpend=null');
       const logged = report.items.find((row: IReportRow) => row.month === '2026-09');
       const never = report.items.find((row: IReportRow) => row.month === '2026-10');
 
-      // Both sum to zero. Only hasActual separates "we spent nothing and said so"
+      // Both sum to zero. Only hasSpend separates "we spent nothing and said so"
       // from "nobody has told us yet".
-      expect(logged?.hasActual).toBe(true);
-      expect(logged?.actualMinor).toBe(0);
-      expect(never?.hasActual).toBe(false);
-      expect(never?.actualMinor).toBeNull();
+      expect(logged?.hasSpend).toBe(true);
+      expect(logged?.spentMinor).toBe(0);
+      expect(never?.hasSpend).toBe(false);
+      expect(never?.spentMinor).toBeNull();
     });
 
     it('excludes a soft deleted expense, which the aggregation has to filter for itself', async () => {
@@ -287,8 +287,8 @@ describe('Reports (e2e)', () => {
       // The base repository applies the soft delete filter everywhere else. An
       // aggregation bypasses it entirely, so omitting deletedAt from the pipeline
       // would resurrect deleted rows in reports and nowhere else.
-      expect(cloud?.actualMinor).toBe(0);
-      expect(cloud?.hasActual).toBe(false);
+      expect(cloud?.spentMinor).toBe(0);
+      expect(cloud?.hasSpend).toBe(false);
     });
   });
 
@@ -305,7 +305,7 @@ describe('Reports (e2e)', () => {
 
       expect(page.totals).toEqual(whole.totals);
       expect(page.totals.planMinor).toBe(5_000_000);
-      expect(page.totals.actualMinor).toBe(4_510_000);
+      expect(page.totals.spentMinor).toBe(4_510_000);
     });
 
     it('pages without repeating or skipping a row', async () => {
@@ -327,20 +327,20 @@ describe('Reports (e2e)', () => {
 
     it('rejects a range that ends before it starts', async () => {
       await request(server())
-        .get('/api/v1/reports/plan-vs-actual?from=2026-06&to=2026-01')
+        .get('/api/v1/reports/plan-vs-spend?from=2026-06&to=2026-01')
         .set('Authorization', auth())
         .expect(400);
     });
 
     it('rejects a malformed month', async () => {
       await request(server())
-        .get('/api/v1/reports/plan-vs-actual?from=2026-6&to=2026-08')
+        .get('/api/v1/reports/plan-vs-spend?from=2026-6&to=2026-08')
         .set('Authorization', auth())
         .expect(400);
     });
 
     it('refuses an unauthenticated read', async () => {
-      await request(server()).get('/api/v1/reports/plan-vs-actual?from=2026-01&to=2026-02').expect(401);
+      await request(server()).get('/api/v1/reports/plan-vs-spend?from=2026-01&to=2026-02').expect(401);
     });
 
     it('never shows one account another account’s numbers', async () => {
@@ -351,7 +351,7 @@ describe('Reports (e2e)', () => {
       const otherToken = (other.body as { accessToken: string }).accessToken;
 
       const response = await request(server())
-        .get('/api/v1/reports/plan-vs-actual?from=2026-01&to=2026-02')
+        .get('/api/v1/reports/plan-vs-spend?from=2026-01&to=2026-02')
         .set('Authorization', `Bearer ${otherToken}`)
         .expect(200);
 
@@ -362,33 +362,33 @@ describe('Reports (e2e)', () => {
   describe('the chart series', () => {
     it('sums each month across every category', async () => {
       const response = await request(server())
-        .get('/api/v1/reports/plan-vs-actual/series?from=2026-01&to=2026-02&groupBy=month')
+        .get('/api/v1/reports/plan-vs-spend/series?from=2026-01&to=2026-02&groupBy=month')
         .set('Authorization', auth())
         .expect(200);
-      const body = response.body as { points: { key: string; planMinor: number; actualMinor: number }[] };
+      const body = response.body as { points: { key: string; planMinor: number; spentMinor: number }[] };
 
       expect(body.points.map((point) => point.key)).toEqual(['2026-01', '2026-02']);
-      expect(body.points[0]?.actualMinor).toBe(2_530_000);
-      expect(body.points[1]?.actualMinor).toBe(1_980_000);
+      expect(body.points[0]?.spentMinor).toBe(2_530_000);
+      expect(body.points[1]?.spentMinor).toBe(1_980_000);
     });
 
     it('agrees with the table it sits beside', async () => {
       const table = await readReport('from=2026-01&to=2026-02');
       const response = await request(server())
-        .get('/api/v1/reports/plan-vs-actual/series?from=2026-01&to=2026-02&groupBy=month')
+        .get('/api/v1/reports/plan-vs-spend/series?from=2026-01&to=2026-02&groupBy=month')
         .set('Authorization', auth())
         .expect(200);
-      const body = response.body as { points: { planMinor: number; actualMinor: number }[] };
-      const seriesTotal = body.points.reduce((sum: number, point) => sum + point.actualMinor, 0);
+      const body = response.body as { points: { planMinor: number; spentMinor: number }[] };
+      const seriesTotal = body.points.reduce((sum: number, point) => sum + point.spentMinor, 0);
 
       // Both come from the same pipeline. If they ever disagree, one of them has
       // grown a second implementation.
-      expect(seriesTotal).toBe(table.totals.actualMinor);
+      expect(seriesTotal).toBe(table.totals.spentMinor);
     });
 
     it('groups by category when asked', async () => {
       const response = await request(server())
-        .get('/api/v1/reports/plan-vs-actual/series?from=2026-01&to=2026-02&groupBy=category')
+        .get('/api/v1/reports/plan-vs-spend/series?from=2026-01&to=2026-02&groupBy=category')
         .set('Authorization', auth())
         .expect(200);
       const body = response.body as { points: { label: string }[] };
@@ -400,18 +400,18 @@ describe('Reports (e2e)', () => {
   describe('the CSV export', () => {
     it('serves a downloadable file with the report in it', async () => {
       const response = await request(server())
-        .get('/api/v1/reports/plan-vs-actual/export?from=2026-01&to=2026-02')
+        .get('/api/v1/reports/plan-vs-spend/export?from=2026-01&to=2026-02')
         .set('Authorization', auth())
         .expect(200);
 
       expect(response.headers['content-type']).toContain('text/csv');
       expect(response.headers['content-disposition']).toContain('attachment');
-      expect(response.headers['content-disposition']).toContain('plan-vs-actual-2026-01-to-2026-02.csv');
+      expect(response.headers['content-disposition']).toContain('plan-vs-spend-2026-01-to-2026-02.csv');
     });
 
     it('writes amounts a spreadsheet reads as numbers', async () => {
       const response = await request(server())
-        .get('/api/v1/reports/plan-vs-actual/export?from=2026-01&to=2026-01')
+        .get('/api/v1/reports/plan-vs-spend/export?from=2026-01&to=2026-01')
         .set('Authorization', auth())
         .expect(200);
       const rows = response.text
@@ -419,14 +419,14 @@ describe('Reports (e2e)', () => {
         .split('\n')
         .map((line: string) => line.trim());
 
-      expect(rows[0]).toBe('Category,Month,Plan,Actual,Variance,Variance %');
+      expect(rows[0]).toBe('Category,Month,Plan,Spent,Variance,Variance %');
       expect(rows).toContain('Marketing,2026-01,5000.00,4800.00,-200.00,-4.00');
     });
 
     it('agrees with the JSON report it was built from', async () => {
       const table = await readReport('from=2026-01&to=2026-02');
       const response = await request(server())
-        .get('/api/v1/reports/plan-vs-actual/export?from=2026-01&to=2026-02')
+        .get('/api/v1/reports/plan-vs-spend/export?from=2026-01&to=2026-02')
         .set('Authorization', auth())
         .expect(200);
       const rows = response.text.trim().split('\n');
@@ -438,13 +438,13 @@ describe('Reports (e2e)', () => {
 
     it('rejects a backwards range like the other two endpoints', async () => {
       await request(server())
-        .get('/api/v1/reports/plan-vs-actual/export?from=2026-06&to=2026-01')
+        .get('/api/v1/reports/plan-vs-spend/export?from=2026-06&to=2026-01')
         .set('Authorization', auth())
         .expect(400);
     });
 
     it('refuses an unauthenticated download', async () => {
-      await request(server()).get('/api/v1/reports/plan-vs-actual/export?from=2026-01&to=2026-02').expect(401);
+      await request(server()).get('/api/v1/reports/plan-vs-spend/export?from=2026-01&to=2026-02').expect(401);
     });
   });
 
@@ -456,7 +456,7 @@ describe('Reports (e2e)', () => {
 
       const before = await readReport('from=2026-12&to=2026-12');
 
-      expect(before.items[0]?.actualMinor).toBe(0);
+      expect(before.items[0]?.spentMinor).toBe(0);
 
       await logExpense(suppliesId, '2026-12', 60_000);
 
@@ -464,7 +464,7 @@ describe('Reports (e2e)', () => {
 
       // The first read populated the cache. A write bumps the account's data
       // version, which makes that entry unreachable rather than merely stale.
-      expect(after.items[0]?.actualMinor).toBe(60_000);
+      expect(after.items[0]?.spentMinor).toBe(60_000);
     });
   });
 });

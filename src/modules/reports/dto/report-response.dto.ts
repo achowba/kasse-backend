@@ -8,11 +8,11 @@ import { PaginationDTO } from '@common/pagination';
  * @property categoryName - Its name, so a client can render a row without a second request.
  * @property month - The month, as `YYYY-MM`.
  * @property planMinor - The target in minor units. 0 when nothing was planned.
- * @property actualMinor - Logged spend in minor units. Null only under the `null` policy.
- * @property varianceMinor - `actual - plan`. Negative means under plan.
+ * @property spentMinor - Logged spend in minor units. Null only under the `null` policy.
+ * @property varianceMinor - `spend - plan`. Negative means under plan.
  * @property variancePercent - The variance as a percentage of the plan. Null when the plan is 0.
  * @property hasPlan - Whether a target exists, so a target of 0 is not read as no target.
- * @property hasActual - Whether anything was logged, so logged 0 is not read as nothing logged.
+ * @property hasSpend - Whether anything was logged, so logged 0 is not read as nothing logged.
  */
 export class ReportRowDTO {
   @ApiProperty({ description: 'The category.', example: '65f1c2d3e4b5a6c7d8e9f0a1' })
@@ -32,10 +32,10 @@ export class ReportRowDTO {
     example: 480_000,
     nullable: true,
   })
-  actualMinor!: number | null;
+  spentMinor!: number | null;
 
   @ApiPropertyOptional({
-    description: 'Actual minus plan. Negative means under plan.',
+    description: 'Spend minus plan. Negative means under plan.',
     example: -20_000,
     nullable: true,
   })
@@ -53,15 +53,15 @@ export class ReportRowDTO {
   hasPlan!: boolean;
 
   @ApiProperty({ description: 'Whether anything was logged. Logged 0 is not the same as nothing logged.', example: true })
-  hasActual!: boolean;
+  hasSpend!: boolean;
 }
 
 /**
  * Both sides summed over the whole range, and the variance between them.
  *
  * @property planMinor - Every target in range.
- * @property actualMinor - Every expense in range.
- * @property varianceMinor - Actual minus plan across the range.
+ * @property spentMinor - Every expense in range.
+ * @property varianceMinor - Spend minus plan across the range.
  * @property variancePercent - The variance as a percentage of the total plan. Null when that is 0.
  */
 export class ReportTotalsDTO {
@@ -69,9 +69,9 @@ export class ReportTotalsDTO {
   planMinor!: number;
 
   @ApiProperty({ description: 'Every expense in range, in minor units.', example: 2_530_000 })
-  actualMinor!: number;
+  spentMinor!: number;
 
-  @ApiProperty({ description: 'Actual minus plan across the range.', example: 30_000 })
+  @ApiProperty({ description: 'Spend minus plan across the range.', example: 30_000 })
   varianceMinor!: number;
 
   @ApiPropertyOptional({

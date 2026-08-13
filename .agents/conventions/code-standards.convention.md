@@ -14,7 +14,7 @@
 - `camelCase` for variables and functions, `PascalCase` for classes and types, `SCREAMING_SNAKE_CASE` for module level constants.
 - Files are `kebab-case` and carry their role: `plans.service.ts`, `plan.schema.ts`, `create-plan.dto.ts`.
 - A money field ends in `Minor` so its unit is visible at the call site: `targetMinor`, `amountMinor`.
-- A boolean reads as a predicate: `hasActual`, `isLocked`. Not `actual`, not `lockFlag`.
+- A boolean reads as a predicate: `hasSpend`, `isLocked`. Not `actual`, not `lockFlag`.
 - Say what a thing is, not what it is not. `activeOnly` rather than `notArchived`.
 
 ### Acronyms

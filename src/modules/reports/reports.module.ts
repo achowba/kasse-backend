@@ -7,7 +7,7 @@ import { ReportsRepository } from './reports.repository';
 import { ReportsService } from './reports.service';
 
 /**
- * Plan against actual, with variance.
+ * Plan against spend, with variance.
  *
  * @remarks
  * Imports plans and expenses for their models rather than their services. The

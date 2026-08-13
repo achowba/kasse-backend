@@ -15,11 +15,7 @@ import { API_DESCRIPTION, API_TAGS, SWAGGER_UI_OPTIONS } from './swagger.constan
  * @returns The document configuration.
  */
 export const buildOpenApiConfig = (version: string): Omit<OpenAPIObject, 'paths'> => {
-  const builder = new DocumentBuilder()
-    .setTitle('Plan vs Actual API')
-    .setDescription(API_DESCRIPTION)
-    .setVersion(version)
-    .addBearerAuth();
+  const builder = new DocumentBuilder().setTitle('Kasse API').setDescription(API_DESCRIPTION).setVersion(version).addBearerAuth();
 
   for (const tag of API_TAGS) {
     builder.addTag(tag.name, tag.description);
@@ -52,7 +48,7 @@ export const buildOpenApiDocument = (app: INestApplication, version: string): Op
 export const setupSwagger = (app: INestApplication, version: string): void => {
   SwaggerModule.setup('docs', app, buildOpenApiDocument(app, version), {
     explorer: true,
-    customSiteTitle: 'Plan vs Actual API',
+    customSiteTitle: 'Kasse API',
     customCss: new SwaggerTheme().getBuffer(SwaggerThemeNameEnum.DARK),
     swaggerOptions: SWAGGER_UI_OPTIONS,
   });

@@ -10,7 +10,7 @@ import { ExpenseSourceEnum } from '../expenses.enums';
  *
  * @remarks
  * An expense is a single line item. The report sums a category's expenses for a
- * month into the figure it calls the actual, which is why there is no uniqueness
+ * month into the figure it calls spend, which is why there is no uniqueness
  * rule here and deliberately so: a month's spend on a category is many expenses.
  * One record per cell would force a client to read, add, and write back, which
  * loses an entry whenever two people log at once.

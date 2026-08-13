@@ -5,7 +5,7 @@ import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { Types } from 'mongoose';
 import { IAppConfig } from '@common/config';
-import { MissingActualPolicyEnum } from '@common/money';
+import { MissingSpendPolicyEnum } from '@common/money';
 import { addMonths, formatMonth } from '@common/month';
 import { AuditActionEnum, AuditEntityEnum, AuditLogService } from '@modules/audit-log';
 import { CategoriesService } from '@modules/categories';
@@ -26,14 +26,14 @@ import { buildReportFilterTool } from './nl-query.tool';
  * @property from - First month, inclusive.
  * @property to - Last month, inclusive.
  * @property categories - Category names, or absent for all.
- * @property missingActuals - The missing actual policy, or absent for the default.
+ * @property missingSpend - The missing spend policy, or absent for the default.
  * @property interpretation - One sentence restating the question.
  */
 interface IToolArguments {
   from?: unknown;
   to?: unknown;
   categories?: unknown;
-  missingActuals?: unknown;
+  missingSpend?: unknown;
   interpretation?: unknown;
 }
 
@@ -104,7 +104,7 @@ export class NlQueryService {
     const categoryNames = await this.readCategoryNames(userId);
     const args = await this.askModel(this.client, question, categoryNames);
     const filter = this.validate(args, categoryNames);
-    const report = await this.reportsService.planVsActual(userId, this.toReportQuery(filter));
+    const report = await this.reportsService.planVsSpend(userId, this.toReportQuery(filter));
 
     this.auditLogService.record({
       userId,
@@ -212,7 +212,7 @@ export class NlQueryService {
     const candidate = plainToInstance(ReportQueryDTO, {
       from: args.from,
       to: args.to,
-      missingActuals: args.missingActuals,
+      missingSpend: args.missingSpend,
       limit: 200,
       offset: 0,
     });
@@ -239,7 +239,7 @@ export class NlQueryService {
       from: candidate.from,
       to: candidate.to,
       categories,
-      ...(candidate.missingActuals === undefined ? {} : { missingActuals: candidate.missingActuals }),
+      ...(candidate.missingSpend === undefined ? {} : { missingSpend: candidate.missingSpend }),
     };
   }
 
@@ -258,7 +258,7 @@ export class NlQueryService {
     return {
       from: filter.from,
       to: filter.to,
-      missingActuals: filter.missingActuals ?? MissingActualPolicyEnum.ZERO,
+      missingSpend: filter.missingSpend ?? MissingSpendPolicyEnum.ZERO,
       limit: 200,
       offset: 0,
     };

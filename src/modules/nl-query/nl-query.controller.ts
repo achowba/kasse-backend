@@ -41,7 +41,7 @@ export class NlQueryController {
 
 **The model never writes a query.** It is given exactly one tool whose schema is a report filter: a month range, some category names, and a policy. It cannot express a collection, a field, an operator, or a database, it never sees a connection string, and the names it may choose from are this account's own categories. Whatever it returns is then validated by the same DTO a hand written report request goes through, and executed by the same report service.
 
-That means this endpoint cannot reach anything \`GET /reports/plan-vs-actual\` could not, whatever the model returns. A model that answers with nonsense produces a validation error, not a query.
+That means this endpoint cannot reach anything \`GET /reports/plan-vs-spend\` could not, whatever the model returns. A model that answers with nonsense produces a validation error, not a query.
 
 **The filter comes back with the data.** A user has to be able to see that "last quarter" was read as the months they meant, and an answer with no visible interpretation is one the reader has to trust blindly.
 

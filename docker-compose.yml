@@ -49,7 +49,7 @@ services:
       # Overrides the host oriented value in .env. `directConnection=true` skips
       # replica set discovery, which matters because the set advertises itself
       # as localhost:27017 and that address means nothing inside this container.
-      MONGODB_URI: mongodb://mongo:27017/plan_vs_actual?directConnection=true
+      MONGODB_URI: mongodb://mongo:27017/kasse?directConnection=true
       # Pinned so the port mapping below stays correct when a workstation .env
       # moves the app off 1413 to free the port for something else.
       PORT: 1413

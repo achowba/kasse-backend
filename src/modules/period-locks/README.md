@@ -4,7 +4,7 @@ Closed accounting periods, and the gate that enforces them.
 
 ## The gate
 
-`assertUnlocked(userId, month, session?)` is the single place a closed period is enforced. Every path that writes a plan or an actual calls it, including every row of a CSV import.
+`assertUnlocked(userId, month, session?)` is the single place a closed period is enforced. Every path that writes a plan or spend calls it, including every row of a CSV import.
 
 It lives in a service rather than a guard or an interceptor for two reasons:
 

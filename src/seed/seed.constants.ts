@@ -6,7 +6,7 @@
  * and so re-running a seeder finds the same account rather than accumulating one
  * per run.
  */
-export const SEED_EMAIL = 'demo@plan-vs-actual.app';
+export const SEED_EMAIL = 'demo@plan-vs-spend.app';
 
 /**
  * The seed account's password.
@@ -27,19 +27,19 @@ export const SEED_PASSWORD = 'demo-account-password';
  * spending more specifically: `Salaries` and `Advertising` rather than `Payroll`
  * and `Marketing`. The sample table's own names are what a reader is checking
  * against, so those are the ones written. February marketing is planned
- * and never spent, which is the case the missing actual policy exists for, so it
+ * and never spent, which is the case the missing spend policy exists for, so it
  * is left out of the expense list on purpose rather than by omission.
  *
  * @property category - The category name.
  * @property month - The month.
  * @property planMinor - The target, in minor units.
- * @property actualMinor - What was spent, or null when nothing was.
+ * @property spentMinor - What was spent, or null when nothing was.
  */
-export const SPEC_ROWS: { category: string; month: string; planMinor: number; actualMinor: number | null }[] = [
-  { category: 'Marketing', month: '2026-01', planMinor: 500_000, actualMinor: 480_000 },
-  { category: 'Payroll', month: '2026-01', planMinor: 2_000_000, actualMinor: 2_050_000 },
-  { category: 'Marketing', month: '2026-02', planMinor: 500_000, actualMinor: null },
-  { category: 'Payroll', month: '2026-02', planMinor: 2_000_000, actualMinor: 1_980_000 },
+export const SPEC_ROWS: { category: string; month: string; planMinor: number; spentMinor: number | null }[] = [
+  { category: 'Marketing', month: '2026-01', planMinor: 500_000, spentMinor: 480_000 },
+  { category: 'Payroll', month: '2026-01', planMinor: 2_000_000, spentMinor: 2_050_000 },
+  { category: 'Marketing', month: '2026-02', planMinor: 500_000, spentMinor: null },
+  { category: 'Payroll', month: '2026-02', planMinor: 2_000_000, spentMinor: 1_980_000 },
 ];
 
 /** The months the demo seeder covers. */

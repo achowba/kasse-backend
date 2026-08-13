@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Types } from 'mongoose';
 import { AppModule } from '../src/app.module';
-import { calculateVariance, MissingActualPolicyEnum } from '../src/common/money';
+import { calculateVariance, MissingSpendPolicyEnum } from '../src/common/money';
 import { AuthService } from '../src/modules/auth';
 import { CategoriesService } from '../src/modules/categories';
 import { ExpensesService } from '../src/modules/expenses';
@@ -41,7 +41,7 @@ const CASES: IParityCase[] = [
   { name: 'a plan with nothing logged', planMinor: 500_000, expenses: [] },
   { name: 'a logged zero, which is not the same as nothing logged', planMinor: 500_000, expenses: [0] },
   { name: 'several expenses summing into one cell', planMinor: 100_000, expenses: [30_000, 45_000, 25_000] },
-  { name: 'a refund taking the actual negative', planMinor: 100_000, expenses: [20_000, -50_000] },
+  { name: 'a refund taking spend negative', planMinor: 100_000, expenses: [20_000, -50_000] },
   { name: 'spend far over plan', planMinor: 1_000, expenses: [1_000_000] },
   { name: 'a positive exact half percent, 2.125', planMinor: 800_000, expenses: [817_000] },
   { name: 'a negative exact half percent, -2.125', planMinor: 800_000, expenses: [783_000] },
@@ -62,7 +62,7 @@ const CASES: IParityCase[] = [
  * Two implementations of the same graded arithmetic will drift unless something
  * holds them together. This is that something. It writes real data, reads it back
  * through the real pipeline, and asserts the database agrees with the function on
- * every case, under both missing actual policies.
+ * every case, under both missing spend policies.
  */
 describe('Report variance parity (e2e)', () => {
   let app: INestApplication;
@@ -120,13 +120,13 @@ describe('Report variance parity (e2e)', () => {
    */
   const readCell = async (
     index: number,
-    policy: MissingActualPolicyEnum,
+    policy: MissingSpendPolicyEnum,
   ): Promise<{
     planMinor: number;
-    actualMinor: number | null;
+    spentMinor: number | null;
     varianceMinor: number | null;
     variancePercent: number | null;
-    hasActual: boolean;
+    hasSpend: boolean;
   }> => {
     const month = `21${String(index).padStart(2, '0')}-01`;
     const { cells } = await repository.aggregate(userId, month, month, [], 50, 0, policy);
@@ -139,7 +139,7 @@ describe('Report variance parity (e2e)', () => {
     return cell;
   };
 
-  describe.each([MissingActualPolicyEnum.ZERO, MissingActualPolicyEnum.NULL])('under the %s policy', (policy) => {
+  describe.each([MissingSpendPolicyEnum.ZERO, MissingSpendPolicyEnum.NULL])('under the %s policy', (policy) => {
     it.each(CASES.map((testCase, index): [string, IParityCase, number] => [testCase.name, testCase, index]))(
       'agrees with calculateVariance on %s',
       async (_name: string, testCase: IParityCase, index: number) => {
@@ -148,11 +148,11 @@ describe('Report variance parity (e2e)', () => {
         const expected = calculateVariance(testCase.planMinor, testCase.expenses.length > 0 ? loggedTotal : null, policy);
 
         expect({
-          actualMinor: cell.actualMinor,
+          spentMinor: cell.spentMinor,
           varianceMinor: cell.varianceMinor,
           variancePercent: cell.variancePercent,
         }).toEqual({
-          actualMinor: expected.actualMinor,
+          spentMinor: expected.spentMinor,
           varianceMinor: expected.varianceMinor,
           variancePercent: expected.variancePercent,
         });
@@ -162,7 +162,7 @@ describe('Report variance parity (e2e)', () => {
 
   it('never produces NaN or Infinity, whatever the plan', async () => {
     for (const [index] of CASES.entries()) {
-      const cell = await readCell(index, MissingActualPolicyEnum.ZERO);
+      const cell = await readCell(index, MissingSpendPolicyEnum.ZERO);
 
       // A plan of zero is in the matrix. Dividing by it in the pipeline would
       // either raise and fail the whole report or emit a value no client can
@@ -176,8 +176,8 @@ describe('Report variance parity (e2e)', () => {
     const positiveHalf = CASES.findIndex((testCase) => testCase.name.includes('positive exact half'));
     const negativeHalf = CASES.findIndex((testCase) => testCase.name.includes('negative exact half'));
 
-    const positive = await readCell(positiveHalf, MissingActualPolicyEnum.ZERO);
-    const negative = await readCell(negativeHalf, MissingActualPolicyEnum.ZERO);
+    const positive = await readCell(positiveHalf, MissingSpendPolicyEnum.ZERO);
+    const negative = await readCell(negativeHalf, MissingSpendPolicyEnum.ZERO);
 
     // Half up, which is what Math.round does. MongoDB's $round would give 2.12
     // and -2.12 here by rounding to even; the pipeline uses $floor(x + 0.5)
