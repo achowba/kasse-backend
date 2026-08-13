@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { DataVersionService } from '@common/cache';
-import { calculateVariance, MissingActualPolicyEnum } from '@common/money';
+import { calculateVariance, MissingSpendPolicyEnum } from '@common/money';
 import { compareMonths, fiscalYearRange } from '@common/month';
 import { UsersService } from '@modules/users';
 import { ReportQueryDTO } from './dto/report-query.dto';
@@ -43,12 +43,12 @@ interface ICacheEntry {
 }
 
 /**
- * Plan against actual, with variance.
+ * Plan against spend, with variance.
  *
  * @remarks
  * **Variance is computed here, not in the pipeline.** It is the piece the whole
  * report is judged on, and as a pure function over two integers it can be tested
- * exhaustively without a database: every branch of plan-is-zero, missing actual,
+ * exhaustively without a database: every branch of plan-is-zero, missing spend,
  * and negative amounts is a unit test rather than an aggregation fixture. The
  * database sums; this decides what those sums mean. At a scale where returning
  * unsummed cells is too much data, `calculateVariance` moves into `$addFields`
@@ -70,14 +70,14 @@ export class ReportsService {
   ) {}
 
   /**
-   * Builds the plan against actual report.
+   * Builds the plan against spend report.
    *
    * @steps
    * 1. Reject a backwards range, which would otherwise return an empty report
    *    that looks like an account with no data.
    * 2. Serve a cached answer when the account has not written since it was built.
    * 3. Aggregate the page, the totals, and the row count in one round trip.
-   * 4. Turn each summed cell into a variance row, applying the missing actual
+   * 4. Turn each summed cell into a variance row, applying the missing spend
    *    policy.
    * 5. Compute the totals row from the range totals, never from the page.
    *
@@ -86,9 +86,9 @@ export class ReportsService {
    * @returns The rows, the totals for the range, and the pagination.
    * @throws BadRequestException When `to` is before `from`.
    */
-  async planVsActual(userId: Types.ObjectId, query: ReportQueryDTO): Promise<ReportResponseDTO> {
+  async planVsSpend(userId: Types.ObjectId, query: ReportQueryDTO): Promise<ReportResponseDTO> {
     const { from, to } = await this.resolveRange(userId, query);
-    const policy = query.missingActuals ?? MissingActualPolicyEnum.ZERO;
+    const policy = query.missingSpend ?? MissingSpendPolicyEnum.ZERO;
     const cacheKey = this.buildKey(userId, 'report', { ...query, from, to }, policy);
     const cached = this.readCache<ReportResponseDTO>(cacheKey);
 
@@ -129,7 +129,7 @@ export class ReportsService {
   async series(userId: Types.ObjectId, query: SeriesQueryDTO): Promise<SeriesResponseDTO> {
     const { from, to } = await this.resolveRange(userId, query);
     const groupBy = query.groupBy ?? SeriesGroupByEnum.MONTH;
-    const cacheKey = this.buildKey(userId, `series:${groupBy}`, { ...query, from, to }, MissingActualPolicyEnum.ZERO);
+    const cacheKey = this.buildKey(userId, `series:${groupBy}`, { ...query, from, to }, MissingSpendPolicyEnum.ZERO);
     const cached = this.readCache<SeriesResponseDTO>(cacheKey);
 
     if (cached !== null) {
@@ -143,7 +143,7 @@ export class ReportsService {
       groupBy,
       points: points.map((point) => ({
         ...point,
-        varianceMinor: point.actualMinor - point.planMinor,
+        varianceMinor: point.spentMinor - point.planMinor,
       })),
     };
 
@@ -156,7 +156,7 @@ export class ReportsService {
    * Renders the report as CSV.
    *
    * @remarks
-   * Reuses {@link ReportsService.planVsActual} rather than reading the database
+   * Reuses {@link ReportsService.planVsSpend} rather than reading the database
    * again, so an export and the table on screen cannot disagree. It also means
    * the export is served from the cache when the table was just read, which is
    * the common order: a user looks at the report, then downloads it.
@@ -171,13 +171,13 @@ export class ReportsService {
    */
   async exportCsv(userId: Types.ObjectId, query: ReportQueryDTO): Promise<{ csv: string; filename: string }> {
     const { from, to } = await this.resolveRange(userId, query);
-    const report = await this.planVsActual(userId, { ...query, from, to, limit: MAX_EXPORT_ROWS, offset: 0 });
+    const report = await this.planVsSpend(userId, { ...query, from, to, limit: MAX_EXPORT_ROWS, offset: 0 });
 
     return {
       csv: renderReportCsv(report.items, report.totals),
       // Named from the resolved range, so a fiscal year download says which
       // months it actually covers rather than repeating the year number.
-      filename: `plan-vs-actual-${from}-to-${to}.csv`,
+      filename: `plan-vs-spend-${from}-to-${to}.csv`,
     };
   }
 
@@ -199,11 +199,11 @@ export class ReportsService {
       categoryName: cell.categoryName,
       month: cell.month,
       planMinor: cell.planMinor,
-      actualMinor: cell.actualMinor,
+      spentMinor: cell.spentMinor,
       varianceMinor: cell.varianceMinor,
       variancePercent: cell.variancePercent,
       hasPlan: cell.hasPlan,
-      hasActual: cell.hasActual,
+      hasSpend: cell.hasSpend,
     };
   }
 
@@ -219,11 +219,11 @@ export class ReportsService {
    * @returns The summary, with its own variance.
    */
   private toTotals(totals: IReportTotals): ReportTotalsDTO {
-    const variance = calculateVariance(totals.planMinor, totals.actualMinor, MissingActualPolicyEnum.ZERO);
+    const variance = calculateVariance(totals.planMinor, totals.spentMinor, MissingSpendPolicyEnum.ZERO);
 
     return {
       planMinor: totals.planMinor,
-      actualMinor: totals.actualMinor,
+      spentMinor: totals.spentMinor,
       varianceMinor: variance.varianceMinor ?? 0,
       variancePercent: variance.variancePercent,
     };
@@ -289,10 +289,10 @@ export class ReportsService {
    * @param userId - The authenticated caller.
    * @param shape - Which endpoint the entry belongs to.
    * @param query - The request, whose every filter has to be in the key.
-   * @param policy - The missing actual policy, which changes the answer.
+   * @param policy - The missing spend policy, which changes the answer.
    * @returns The key.
    */
-  private buildKey(userId: Types.ObjectId, shape: string, query: SeriesQueryDTO, policy: MissingActualPolicyEnum): string {
+  private buildKey(userId: Types.ObjectId, shape: string, query: SeriesQueryDTO, policy: MissingSpendPolicyEnum): string {
     const paged = query as ReportQueryDTO;
     const categoryIds = [...(query.categoryIds ?? [])].sort().join(',');
 

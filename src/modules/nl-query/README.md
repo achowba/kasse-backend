@@ -18,7 +18,7 @@ from            YYYY-MM
 to              YYYY-MM
 categories      names from this account's own list
 groupBy         month | category
-missingActuals  zero | null
+missingSpend  zero | null
 interpretation  one sentence, shown back to the user
 ```
 
@@ -28,7 +28,7 @@ It cannot express a collection, a field, an operator, or a database. It never se
 
 Whatever comes back goes through `ReportQueryDTO`, the same class-validator DTO a hand written request passes, with `whitelist` and `forbidNonWhitelisted` on. Then the same `ReportsService` runs it.
 
-That means **this endpoint cannot reach anything `GET /reports/plan-vs-actual` could not**, whatever the model returns. A reply carrying `$where`, a `userId`, or a `limit` of a million loses those fields at the validation boundary; a reply with a malformed month is a `502`, not a query. Tests assert exactly those cases rather than only the happy path.
+That means **this endpoint cannot reach anything `GET /reports/plan-vs-spend` could not**, whatever the model returns. A reply carrying `$where`, a `userId`, or a `limit` of a million loses those fields at the validation boundary; a reply with a malformed month is a `502`, not a query. Tests assert exactly those cases rather than only the happy path.
 
 Two checks go beyond the DTO:
 

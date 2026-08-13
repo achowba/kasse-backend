@@ -1,7 +1,7 @@
 {
-  "name": "plan-vs-actual-api",
+  "name": "kasse-api",
   "version": "0.1.0",
-  "description": "Backend API for the Plan vs Actual Tracker: monthly spending targets, logged actuals, variance reporting, and period locking.",
+  "description": "Backend API for the Kasse: monthly spending targets, logged actuals, variance reporting, and period locking.",
   "private": true,
   "license": "UNLICENSED",
   "engines": {

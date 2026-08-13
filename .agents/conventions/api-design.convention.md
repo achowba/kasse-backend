@@ -68,5 +68,5 @@ Every list endpoint paginates. There are no unbounded collection reads.
 
 ## Nulls
 
-- `null` means "not known" and is distinct from `0`, which means "known to be zero". A report row carries `hasActual` so the two are never confused.
+- `null` means "not known" and is distinct from `0`, which means "known to be zero". A report row carries `hasSpend` so the two are never confused.
 - An undefined percentage is `null`, never `NaN` and never `Infinity`.

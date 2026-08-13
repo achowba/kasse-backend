@@ -52,7 +52,7 @@ export const MAX_EXPORT_ROWS = 10_000;
  * not consume this file: exporting a report and re-importing it would mean
  * importing computed columns, which is not a thing that can be done.
  */
-export const CSV_COLUMNS = ['Category', 'Month', 'Plan', 'Actual', 'Variance', 'Variance %'] as const;
+export const CSV_COLUMNS = ['Category', 'Month', 'Plan', 'Spent', 'Variance', 'Variance %'] as const;
 
 /** The label on the appended totals row. */
 export const CSV_TOTALS_LABEL = 'Total';

@@ -46,14 +46,14 @@ describe('Seeders (e2e)', () => {
     });
 
     it('produces the published sample table exactly', async () => {
-      const report = await reportsService.planVsActual(userId, { from: '2026-01', to: '2026-02', limit: 50, offset: 0 });
+      const report = await reportsService.planVsSpend(userId, { from: '2026-01', to: '2026-02', limit: 50, offset: 0 });
 
       expect(
         report.items.map((row) => [
           row.month,
           row.categoryName,
           row.planMinor,
-          row.actualMinor,
+          row.spentMinor,
           row.varianceMinor,
           row.variancePercent,
         ]),
@@ -66,7 +66,7 @@ describe('Seeders (e2e)', () => {
     });
 
     it('leaves February marketing genuinely unlogged, not logged as zero', async () => {
-      const report = await reportsService.planVsActual(userId, {
+      const report = await reportsService.planVsSpend(userId, {
         from: '2026-02',
         to: '2026-02',
         limit: 50,
@@ -74,15 +74,15 @@ describe('Seeders (e2e)', () => {
       });
       const marketing = report.items.find((row) => row.categoryName === 'Marketing');
 
-      // The distinction the whole missing actual policy rests on. If the seeder
+      // The distinction the whole missing spend policy rests on. If the seeder
       // had written a zero expense here, the sample table would still look right
       // while the flag underneath it was wrong.
-      expect(marketing?.hasActual).toBe(false);
+      expect(marketing?.hasSpend).toBe(false);
       expect(marketing?.hasPlan).toBe(true);
     });
 
     it('writes nothing beyond the sample table, so nothing else can be mistaken for it', async () => {
-      const report = await reportsService.planVsActual(userId, { from: '2020-01', to: '2030-12', limit: 200, offset: 0 });
+      const report = await reportsService.planVsSpend(userId, { from: '2020-01', to: '2030-12', limit: 200, offset: 0 });
 
       expect(report.pagination.total).toBe(4);
     });
@@ -90,7 +90,7 @@ describe('Seeders (e2e)', () => {
     it('can be run twice without changing the targets', async () => {
       await seedService.seedSpec();
 
-      const report = await reportsService.planVsActual(userId, { from: '2026-01', to: '2026-01', limit: 50, offset: 0 });
+      const report = await reportsService.planVsSpend(userId, { from: '2026-01', to: '2026-01', limit: 50, offset: 0 });
       const marketing = report.items.find((row) => row.categoryName === 'Marketing');
 
       // A plan is a cell, so re-seeding overwrites it rather than duplicating it.
@@ -114,7 +114,7 @@ describe('Seeders (e2e)', () => {
     });
 
     it('produces spend on both sides of plan rather than a column of near misses', async () => {
-      const report = await reportsService.planVsActual(userId, { from: '2026-01', to: '2026-12', limit: 500, offset: 0 });
+      const report = await reportsService.planVsSpend(userId, { from: '2026-01', to: '2026-12', limit: 500, offset: 0 });
       const over = report.items.filter((row) => (row.varianceMinor ?? 0) > 0);
       const under = report.items.filter((row) => (row.varianceMinor ?? 0) < 0);
 
@@ -123,8 +123,8 @@ describe('Seeders (e2e)', () => {
     });
 
     it('includes spend against categories with no plan, which a naive report would drop', async () => {
-      const report = await reportsService.planVsActual(userId, { from: '2026-01', to: '2026-12', limit: 500, offset: 0 });
-      const unplanned = report.items.filter((row) => !row.hasPlan && row.hasActual);
+      const report = await reportsService.planVsSpend(userId, { from: '2026-01', to: '2026-12', limit: 500, offset: 0 });
+      const unplanned = report.items.filter((row) => !row.hasPlan && row.hasSpend);
 
       expect(unplanned.length).toBeGreaterThan(0);
     });
@@ -132,7 +132,7 @@ describe('Seeders (e2e)', () => {
     it('closes a quarter, so a reviewer can watch an edit be rejected', async () => {
       const periodLocks = app.get(PeriodLocksService);
       const plansService = app.get(PlansService);
-      const report = await reportsService.planVsActual(userId, { from: '2026-01', to: '2026-01', limit: 1, offset: 0 });
+      const report = await reportsService.planVsSpend(userId, { from: '2026-01', to: '2026-01', limit: 1, offset: 0 });
       const categoryId = report.items[0]?.categoryId ?? '';
 
       await expect(periodLocks.assertUnlocked(userId, '2026-01')).rejects.toBeInstanceOf(PeriodLockedException);
@@ -143,8 +143,8 @@ describe('Seeders (e2e)', () => {
     });
 
     it('is deterministic, so two runs of the report agree', async () => {
-      const first = await reportsService.planVsActual(userId, { from: '2026-06', to: '2026-06', limit: 50, offset: 0 });
-      const second = await reportsService.planVsActual(userId, { from: '2026-06', to: '2026-06', limit: 50, offset: 0 });
+      const first = await reportsService.planVsSpend(userId, { from: '2026-06', to: '2026-06', limit: 50, offset: 0 });
+      const second = await reportsService.planVsSpend(userId, { from: '2026-06', to: '2026-06', limit: 50, offset: 0 });
 
       expect(first.totals).toEqual(second.totals);
     });

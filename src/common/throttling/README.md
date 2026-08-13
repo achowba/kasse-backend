@@ -27,7 +27,7 @@ Beyond the global limit, two routes carry their own, because they are not the sa
 
 | Route | Limit | Why |
 |---|---|---|
-| `GET /reports/plan-vs-actual` and its series and export | 60/min | An aggregation across two collections. Cached per account and per data version, so a reader refreshing the same view costs one query and then nothing. The limit bounds *distinct questions*, not page views, which is why it can sit well below the global limit without getting in anyone's way. |
+| `GET /reports/plan-vs-spend` and its series and export | 60/min | An aggregation across two collections. Cached per account and per data version, so a reader refreshing the same view costs one query and then nothing. The limit bounds *distinct questions*, not page views, which is why it can sit well below the global limit without getting in anyone's way. |
 | `POST /imports/expenses` | 6/min | Parses up to 5 MB in memory, validates every row, and writes up to ten thousand records in one transaction. The most expensive thing an authenticated caller can ask for, by a wide margin. Six per minute is more than anyone uploading spreadsheets needs. |
 
 ## Why the limits are configuration

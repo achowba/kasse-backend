@@ -7,7 +7,7 @@ npm run seed:spec    # exactly the published sample table
 npm run seed:demo    # a year of varied data
 ```
 
-Both write to one account, `demo@plan-vs-actual.app`, so a reviewer can log in without being told a generated address, and re-running finds the same account rather than accumulating one per run. The password is in `seed.constants.ts` deliberately: it opens a local database of invented numbers, and a deployment seeds nothing, so the account does not exist there.
+Both write to one account, `demo@kasse.app`, so a reviewer can log in without being told a generated address, and re-running finds the same account rather than accumulating one per run. The password is in `seed.constants.ts` deliberately: it opens a local database of invented numbers, and a deployment seeds nothing, so the account does not exist there.
 
 ## Why they go through the services
 
@@ -21,7 +21,7 @@ Writes the four rows of the published sample table and nothing else, so nothing 
 
 Two details that matter more than they look:
 
-- **February marketing is planned and never spent.** Not logged as zero. That is the distinction the whole missing-actual policy rests on, and a seeder that wrote a zero expense there would produce a table that looked right while the flag underneath it was wrong. A test asserts `hasActual` is false.
+- **February marketing is planned and never spent.** Not logged as zero. That is the distinction the whole missing-spend policy rests on, and a seeder that wrote a zero expense there would produce a table that looked right while the flag underneath it was wrong. A test asserts `hasSpend` is false.
 - **`Marketing` and `Payroll` are created on the account**, not resolved from the shared catalogue, which breaks spending down further into `Advertising` and `Salaries`. Bending the sample to fit the catalogue would stop a reader checking it against the table they have.
 
 An e2e test runs this seeder and asserts the report returns the published variances exactly, which is the automated form of the manual check in the plan.

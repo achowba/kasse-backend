@@ -31,9 +31,9 @@ export const API_DESCRIPTION = `Monthly spending targets, logged expenses, and v
 
 **Months** are the string \`YYYY-MM\`.
 
-**Variance** is \`actual - plan\`. Variance percent is \`null\` when the plan is zero, never \`NaN\`.
+**Variance** is \`spend - plan\`. Variance percent is \`null\` when the plan is zero, never \`NaN\`.
 
-**Missing actuals** default to \`0\`. Pass \`missingActuals=null\` to receive \`null\` instead. Every report row carries \`hasActual\`, so a logged zero is never confused with nothing logged.
+**Missing spend** default to \`0\`. Pass \`missingSpend=null\` to receive \`null\` instead. Every report row carries \`hasSpend\`, so a logged zero is never confused with nothing logged.
 
 **Locked periods** reject writes with \`423\` and the code \`PERIOD_LOCKED\`.
 

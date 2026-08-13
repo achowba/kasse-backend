@@ -76,11 +76,11 @@ export class SeedService {
         targetMinor: row.planMinor,
       });
 
-      if (row.actualMinor !== null) {
+      if (row.spentMinor !== null) {
         await this.expensesService.create(userId, {
           categoryId,
           month: row.month,
-          amountMinor: row.actualMinor,
+          amountMinor: row.spentMinor,
         });
       }
     }

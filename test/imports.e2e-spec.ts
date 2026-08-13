@@ -85,15 +85,15 @@ describe('Imports (e2e)', () => {
    * Reads the total logged for a month from the report.
    *
    * @param month - The month to read.
-   * @returns The actual total in minor units.
+   * @returns The spend total in minor units.
    */
   const reportedTotal = async (month: string): Promise<number> => {
     const response = await request(server())
-      .get(`/api/v1/reports/plan-vs-actual?from=${month}&to=${month}`)
+      .get(`/api/v1/reports/plan-vs-spend?from=${month}&to=${month}`)
       .set('Authorization', auth())
       .expect(200);
 
-    return (response.body as { totals: { actualMinor: number } }).totals.actualMinor;
+    return (response.body as { totals: { spentMinor: number } }).totals.spentMinor;
   };
 
   const header = 'category,month,amount,note';

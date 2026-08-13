@@ -6,7 +6,7 @@
 - Never store or compute money as a floating point number. `0.1 + 0.2` is not `0.3`, and a reporting total that is wrong by a cent is a wrong report.
 - Minor units are safe as a BSON double up to 2^53, which is more than any realistic budget. `Decimal128` is not needed while every amount is an integer.
 - One currency per user. A currency field lives on the user, not on each row. Mixed currency totals need an exchange rate policy, which is out of scope.
-- A plan target is zero or positive. An actual may be negative, because credit notes and refunds exist.
+- A plan target is zero or positive. An expense may be negative, because credit notes and refunds exist.
 
 ## Months and periods
 
@@ -59,6 +59,6 @@ The audit log itself is neither updated nor deleted, softly or otherwise. It is 
 
 ## Auditing
 
-- Every change to a plan, an actual, or a lock writes an audit record with the actor, the action, the entity, the before value, the after value, and the request id.
+- Every change to a plan, an expense, or a lock writes an audit record with the actor, the action, the entity, the before value, the after value, and the request id.
 - The audit collection is append only. No code path updates or deletes a row in it.
 - Audit records hold no IP address and no user agent. Those are personal identifiers, and the trail's job is to say what changed and by which account.

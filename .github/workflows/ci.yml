@@ -57,4 +57,4 @@ jobs:
 
       # Builds the same multi-stage image that ships, so a broken Dockerfile
       # fails here rather than at deploy time.
-      - run: docker build -t plan-vs-actual-api:ci .
+      - run: docker build -t kasse-api:ci .

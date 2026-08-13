@@ -7,8 +7,8 @@ import { SeriesGroupByEnum } from '../reports.enums';
  * @property key - The month, or the category id, this point is grouped under.
  * @property label - What to render on the axis.
  * @property planMinor - Planned, summed for this point.
- * @property actualMinor - Logged, summed for this point.
- * @property varianceMinor - Actual minus plan for this point.
+ * @property spentMinor - Logged, summed for this point.
+ * @property varianceMinor - Spend minus plan for this point.
  */
 export class SeriesPointDTO {
   @ApiProperty({ description: 'The month, or the category id, this point is grouped under.', example: '2026-01' })
@@ -21,9 +21,9 @@ export class SeriesPointDTO {
   planMinor!: number;
 
   @ApiProperty({ description: 'Logged, summed for this point.', example: 2_530_000 })
-  actualMinor!: number;
+  spentMinor!: number;
 
-  @ApiProperty({ description: 'Actual minus plan for this point.', example: 30_000 })
+  @ApiProperty({ description: 'Spend minus plan for this point.', example: 30_000 })
   varianceMinor!: number;
 }
 

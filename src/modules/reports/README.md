@@ -1,6 +1,6 @@
 # modules/reports
 
-Plan against actual, with variance. This is what the rest of the system exists to produce.
+Plan against spend, with variance. This is what the rest of the system exists to produce.
 
 ## One aggregation, not two queries
 
@@ -15,8 +15,8 @@ The obvious pipeline starts at `plans` and `$lookup`s the matching expenses. It 
 That is not an obscure edge case. It is unplanned spend, which is usually the single most interesting row in a variance report, and a plan-side join never sees it. So both sides are projected into one shape, unioned, and grouped by category and month. A cell that exists on either side alone survives.
 
 ```
-plans      ->  { categoryId, month, planMinor: targetMinor, actualMinor: 0 }
-expenses   ->  { categoryId, month, planMinor: 0,           actualMinor: amountMinor }
+plans      ->  { categoryId, month, planMinor: targetMinor, spentMinor: 0 }
+expenses   ->  { categoryId, month, planMinor: 0,           spentMinor: amountMinor }
                               |
                        $group by cell, $sum both
                               |
@@ -25,7 +25,7 @@ expenses   ->  { categoryId, month, planMinor: 0,           actualMinor: amountM
               $facet { rows (paged) | totals (whole range) | count }
 ```
 
-`$max` over the `hasPlan` and `hasActual` booleans is how a cell learns that either side contributed: `false` sorts below `true`, so the maximum is `true` when any row set it. Summing would produce a count, which is not the question.
+`$max` over the `hasPlan` and `hasSpend` booleans is how a cell learns that either side contributed: `false` sorts below `true`, so the maximum is `true` when any row set it. Summing would produce a count, which is not the question.
 
 ## Why `$facet`
 
@@ -60,8 +60,8 @@ Dividing by zero inside an aggregation raises and fails the **entire report**. A
 | Case | Answer |
 |---|---|
 | **Plan is 0** | `variancePercent` is `null`. Never `NaN`, never `Infinity`, never a fabricated 100%. `varianceMinor` is still correct and still worth showing: it is the whole of the unplanned spend. |
-| **Nothing logged** | Follows `?missingActuals=`. Under `zero` (default) the actual is 0 and the variance is the whole target. Under `null` the actual, variance, and percent are all `null` so a client renders a dash. |
-| **Logged zero** | Not the same thing. `hasActual` distinguishes them, so a month someone recorded as zero spend is never confused with a month nobody has reported yet. Both sum to 0, so the flag is the only thing that can tell them apart. |
+| **Nothing logged** | Follows `?missingSpend=`. Under `zero` (default) the spend is 0 and the variance is the whole target. Under `null` the spend, variance, and percent are all `null` so a client renders a dash. |
+| **Logged zero** | Not the same thing. `hasSpend` distinguishes them, so a month someone recorded as zero spend is never confused with a month nobody has reported yet. Both sum to 0, so the flag is the only thing that can tell them apart. |
 
 ## Soft deletes have to be filtered here by hand
 
@@ -79,7 +79,7 @@ Per process, deliberately. Each instance holds its own cache and its own counter
 
 ## The series endpoint
 
-`GET /reports/plan-vs-actual/series` collapses the same numbers onto one axis, unpaginated, for charts. It shares the pipeline up to the grouping rather than reimplementing it, so a chart and the table beside it cannot disagree. An e2e test asserts exactly that by summing the series and comparing it to the table's totals.
+`GET /reports/plan-vs-spend/series` collapses the same numbers onto one axis, unpaginated, for charts. It shares the pipeline up to the grouping rather than reimplementing it, so a chart and the table beside it cannot disagree. An e2e test asserts exactly that by summing the series and comparing it to the table's totals.
 
 ## Fiscal years
 
@@ -95,7 +95,7 @@ Adding eleven months to a start month has to roll the year over rather than prod
 
 ## The CSV export
 
-`GET /reports/plan-vs-actual/export` renders the same report as a file, with a labelled totals row appended. It calls `planVsActual` rather than reading the database again, so the file and the table on screen cannot disagree, and a download straight after viewing is served from the same cached result.
+`GET /reports/plan-vs-spend/export` renders the same report as a file, with a labelled totals row appended. It calls `planVsActual` rather than reading the database again, so the file and the table on screen cannot disagree, and a download straight after viewing is served from the same cached result.
 
 Three formatting decisions, each of which has a wrong answer that looks fine:
 
@@ -123,8 +123,8 @@ Imports `@modules/plans` and `@modules/expenses` for their models, not their ser
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/api/v1/reports/plan-vs-actual` | The report: rows for the range, plus totals over the whole range. |
-| `GET` | `/api/v1/reports/plan-vs-actual/series` | The same numbers grouped by month or category, unpaginated, for a chart. |
+| `GET` | `/api/v1/reports/plan-vs-spend` | The report: rows for the range, plus totals over the whole range. |
+| `GET` | `/api/v1/reports/plan-vs-spend/series` | The same numbers grouped by month or category, unpaginated, for a chart. |
 
 ## Dependencies on other modules
 

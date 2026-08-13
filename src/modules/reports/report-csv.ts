@@ -31,7 +31,7 @@ const amount = (minor: number): string => formatMinorAsMajor(minor);
 const percentage = (percent: number | null): string => (percent === null ? '-' : percent.toFixed(2));
 
 /**
- * Renders an actual, or a dash when nothing was logged.
+ * Renders spend, or a dash when nothing was logged.
  *
  * @param minor - The amount in minor units, or null under the `null` policy.
  * @returns The amount, or a dash.
@@ -60,7 +60,7 @@ export const renderReportCsv = (rows: ReportRowDTO[], totals: ReportTotalsDTO): 
     row.categoryName,
     row.month,
     amount(row.planMinor),
-    optionalAmount(row.actualMinor),
+    optionalAmount(row.spentMinor),
     optionalAmount(row.varianceMinor),
     percentage(row.variancePercent),
   ]);
@@ -69,7 +69,7 @@ export const renderReportCsv = (rows: ReportRowDTO[], totals: ReportTotalsDTO): 
     CSV_TOTALS_LABEL,
     '',
     amount(totals.planMinor),
-    amount(totals.actualMinor),
+    amount(totals.spentMinor),
     amount(totals.varianceMinor),
     percentage(totals.variancePercent),
   ]);

@@ -141,7 +141,7 @@ That is why a month change is checked at both ends. Moving an expense out of a c
   @ApiParam({ name: 'expenseId', description: 'Identifier from the expense list.', example: '65f1c2d3e4b5a6c7d8e9f0c1' })
   @ApiOperation({
     summary: 'Remove an expense',
-    description: `Removes an expense, so it no longer counts toward the actual figure for its category and month.
+    description: `Removes an expense, so it no longer counts toward the spend figure for its category and month.
 
 The delete is soft. The audit trail keeps what the expense was, so a report run before the deletion can still be explained.
 

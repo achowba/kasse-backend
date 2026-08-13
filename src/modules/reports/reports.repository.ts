@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, PipelineStage, Types } from 'mongoose';
-import { MissingActualPolicyEnum } from '@common/money';
+import { MissingSpendPolicyEnum } from '@common/money';
 import { Plan } from '@modules/plans';
 import { CATEGORIES_COLLECTION, EXPENSES_COLLECTION } from './reports.constants';
 import { SeriesGroupByEnum } from './reports.enums';
@@ -14,33 +14,33 @@ import { varianceStage } from './variance.stage';
  * @property categoryName - Its name, resolved in the aggregation.
  * @property month - The month, as `YYYY-MM`.
  * @property planMinor - The target, or 0 when nothing was planned.
- * @property actualMinor - Logged spend. Null under the `null` policy when nothing was logged.
- * @property varianceMinor - Actual minus plan, computed in the pipeline. Null when the actual is null.
+ * @property spentMinor - Logged spend. Null under the `null` policy when nothing was logged.
+ * @property varianceMinor - Spend minus plan, computed in the pipeline. Null when the spend is null.
  * @property variancePercent - The variance over the plan, to two decimal places. Null when the plan is 0.
  * @property hasPlan - Whether a target exists, so a target of 0 is distinguishable from no target.
- * @property hasActual - Whether anything was logged, so logged 0 is distinguishable from nothing logged.
+ * @property hasSpend - Whether anything was logged, so logged 0 is distinguishable from nothing logged.
  */
 export interface IReportCell {
   categoryId: Types.ObjectId;
   categoryName: string;
   month: string;
   planMinor: number;
-  actualMinor: number | null;
+  spentMinor: number | null;
   varianceMinor: number | null;
   variancePercent: number | null;
   hasPlan: boolean;
-  hasActual: boolean;
+  hasSpend: boolean;
 }
 
 /**
  * Both sides summed across the whole range.
  *
  * @property planMinor - Every target in range.
- * @property actualMinor - Every expense in range.
+ * @property spentMinor - Every expense in range.
  */
 export interface IReportTotals {
   planMinor: number;
-  actualMinor: number;
+  spentMinor: number;
 }
 
 /**
@@ -49,17 +49,17 @@ export interface IReportTotals {
  * @property key - The month or the category id the point is grouped under.
  * @property label - What to render on the axis.
  * @property planMinor - Planned, summed for this point.
- * @property actualMinor - Logged, summed for this point.
+ * @property spentMinor - Logged, summed for this point.
  */
 export interface ISeriesPoint {
   key: string;
   label: string;
   planMinor: number;
-  actualMinor: number;
+  spentMinor: number;
 }
 
 /**
- * The aggregation behind the plan against actual report.
+ * The aggregation behind the plan against spend report.
  *
  * @remarks
  * The whole report is one round trip. The alternative, reading plans and expenses
@@ -113,7 +113,7 @@ export class ReportsRepository {
     categoryIds: Types.ObjectId[],
     limit: number,
     offset: number,
-    policy: MissingActualPolicyEnum,
+    policy: MissingSpendPolicyEnum,
   ): Promise<{ cells: IReportCell[]; totals: IReportTotals; total: number }> {
     const pipeline: PipelineStage[] = [
       ...this.unionedSides(userId, from, to, categoryIds),
@@ -136,7 +136,7 @@ export class ReportsRepository {
               $group: {
                 _id: null,
                 planMinor: { $sum: '$planMinor' },
-                actualMinor: { $sum: '$actualMinor' },
+                spentMinor: { $sum: '$spentMinor' },
               },
             },
           ],
@@ -155,7 +155,7 @@ export class ReportsRepository {
       cells: result?.rows ?? [],
       // An empty range produces empty facets rather than zeroed ones, because
       // there is nothing for `$group` to run over. Zero is the right answer.
-      totals: result?.totals[0] ?? { planMinor: 0, actualMinor: 0 },
+      totals: result?.totals[0] ?? { planMinor: 0, spentMinor: 0 },
       total: result?.count[0]?.value ?? 0,
     };
   }
@@ -195,10 +195,10 @@ export class ReportsRepository {
           // through the grouping to be labelled.
           label: { $first: byMonth ? '$month' : '$categoryName' },
           planMinor: { $sum: '$planMinor' },
-          actualMinor: { $sum: '$actualMinor' },
+          spentMinor: { $sum: '$spentMinor' },
         },
       },
-      { $project: { _id: 0, key: { $toString: '$_id' }, label: 1, planMinor: 1, actualMinor: 1 } },
+      { $project: { _id: 0, key: { $toString: '$_id' }, label: 1, planMinor: 1, spentMinor: 1 } },
       { $sort: byMonth ? { key: 1 } : { label: 1 } },
     ]);
   }
@@ -234,9 +234,9 @@ export class ReportsRepository {
           categoryId: 1,
           month: 1,
           planMinor: '$targetMinor',
-          actualMinor: { $literal: 0 },
+          spentMinor: { $literal: 0 },
           hasPlan: { $literal: true },
-          hasActual: { $literal: false },
+          hasSpend: { $literal: false },
         },
       },
       {
@@ -250,9 +250,9 @@ export class ReportsRepository {
                 categoryId: 1,
                 month: 1,
                 planMinor: { $literal: 0 },
-                actualMinor: '$amountMinor',
+                spentMinor: '$amountMinor',
                 hasPlan: { $literal: false },
-                hasActual: { $literal: true },
+                hasSpend: { $literal: true },
               },
             },
           ],
@@ -278,9 +278,9 @@ export class ReportsRepository {
         $group: {
           _id: { categoryId: '$categoryId', month: '$month' },
           planMinor: { $sum: '$planMinor' },
-          actualMinor: { $sum: '$actualMinor' },
+          spentMinor: { $sum: '$spentMinor' },
           hasPlan: { $max: '$hasPlan' },
-          hasActual: { $max: '$hasActual' },
+          hasSpend: { $max: '$hasSpend' },
         },
       },
       {
@@ -303,9 +303,9 @@ export class ReportsRepository {
           // locked period stops explaining its own numbers.
           categoryName: { $ifNull: [{ $first: '$category.name' }, 'Unknown category'] },
           planMinor: 1,
-          actualMinor: 1,
+          spentMinor: 1,
           hasPlan: 1,
-          hasActual: 1,
+          hasSpend: 1,
         },
       },
     ];

@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, MaxLength, MinLength } from 'class-validator';
-import { MissingActualPolicyEnum } from '@common/money';
+import { MissingSpendPolicyEnum } from '@common/money';
 import { ReportResponseDTO } from '@modules/reports';
 import { MAX_QUESTION_LENGTH } from '../nl-query.constants';
 
@@ -33,7 +33,7 @@ export class NlQueryDTO {
  * @property from - First month the report covers.
  * @property to - Last month the report covers.
  * @property categories - The categories it was narrowed to, empty for all of them.
- * @property missingActuals - The policy applied to months with nothing logged.
+ * @property missingSpend - The policy applied to months with nothing logged.
  */
 export class NlQueryFilterDTO {
   @ApiProperty({
@@ -51,8 +51,8 @@ export class NlQueryFilterDTO {
   @ApiProperty({ description: 'Categories it was narrowed to. Empty means every category.', type: [String] })
   categories!: string[];
 
-  @ApiPropertyOptional({ description: 'The policy applied to months with nothing logged.', enum: MissingActualPolicyEnum })
-  missingActuals?: MissingActualPolicyEnum;
+  @ApiPropertyOptional({ description: 'The policy applied to months with nothing logged.', enum: MissingSpendPolicyEnum })
+  missingSpend?: MissingSpendPolicyEnum;
 }
 
 /**

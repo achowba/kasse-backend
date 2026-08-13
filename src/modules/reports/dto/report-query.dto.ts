@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { IsEnum, IsInt, IsMongoId, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
-import { MissingActualPolicyEnum } from '@common/money';
+import { MissingSpendPolicyEnum } from '@common/money';
 import { MONTH_PATTERN } from '@common/month';
 import { PaginationQueryDTO } from '@common/pagination';
 import { MAX_FISCAL_YEAR, MIN_FISCAL_YEAR } from '../reports.constants';
@@ -18,7 +18,7 @@ import { MAX_FISCAL_YEAR, MIN_FISCAL_YEAR } from '../reports.constants';
  * @property to - Last month of the range, inclusive. Required unless `fiscalYear` is given.
  * @property fiscalYear - A fiscal year, resolved to a range through the account's fiscal year start.
  * @property categoryIds - Restrict to these categories. Every category when absent.
- * @property missingActuals - How to report a category and month with a target but nothing logged.
+ * @property missingSpend - How to report a category and month with a target but nothing logged.
  */
 export class ReportQueryDTO extends PaginationQueryDTO {
   @ApiPropertyOptional({
@@ -75,11 +75,11 @@ export class ReportQueryDTO extends PaginationQueryDTO {
 
   @ApiPropertyOptional({
     description:
-      'How to report a category and month with a target but nothing logged. `zero` treats it as 0 spent, so the variance is the whole target. `null` reports the actual, variance, and percent as null, so a client can render a dash.',
-    enum: MissingActualPolicyEnum,
-    default: MissingActualPolicyEnum.ZERO,
+      'How to report a category and month with a target but nothing logged. `zero` treats it as 0 spent, so the variance is the whole target. `null` reports the spend, variance, and percent as null, so a client can render a dash.',
+    enum: MissingSpendPolicyEnum,
+    default: MissingSpendPolicyEnum.ZERO,
   })
   @IsOptional()
-  @IsEnum(MissingActualPolicyEnum)
-  missingActuals?: MissingActualPolicyEnum;
+  @IsEnum(MissingSpendPolicyEnum)
+  missingSpend?: MissingSpendPolicyEnum;
 }

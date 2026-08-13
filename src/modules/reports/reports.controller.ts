@@ -21,7 +21,7 @@ import { SeriesResponseDTO } from './dto/series-response.dto';
 import { ReportsService } from './reports.service';
 
 /**
- * Plan against actual, with variance.
+ * Plan against spend, with variance.
  */
 @ApiTags('Reports')
 @ApiBearerAuth()
@@ -31,32 +31,32 @@ export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
   /**
-   * Builds the plan against actual report.
+   * Builds the plan against spend report.
    *
    * @param user - The authenticated caller.
    * @param query - The range, filters, and paging.
    * @returns The rows and the totals for the range.
    */
-  @Get('plan-vs-actual')
+  @Get('plan-vs-spend')
   @Throttle({ default: { limit: REPORT_THROTTLE_LIMIT, ttl: EXPENSIVE_THROTTLE_TTL_MS } })
   @ApiOperation({
-    summary: 'Plan against actual, with variance',
+    summary: 'Plan against spend, with variance',
     description: `One row per category and month in the range, with the target, what was spent, and the difference.
 
-**Variance** is \`actual - plan\`, so a negative number means under plan. **Variance percent** is \`(actual - plan) / plan * 100\` to two decimal places.
+**Variance** is \`spend - plan\`, so a negative number means under plan. **Variance percent** is \`(spend - plan) / plan * 100\` to two decimal places.
 
 **When the plan is 0, \`variancePercent\` is \`null\`.** Never \`NaN\`, never \`Infinity\`, and never a fabricated 100%. Dividing by zero has no answer, and a client renders \`N/A\`. The absolute \`varianceMinor\` is still correct and still worth showing: it is the whole of the unplanned spend.
 
 **A category with spend but no plan still appears.** That row is unplanned spend, which is usually the most interesting line in the report, and a naive join from the plan side would silently drop it.
 
-**Missing actuals** follow \`?missingActuals=\`. Under \`zero\` (the default) a month with a target and nothing logged reports an actual of 0 and a variance of the whole target. Under \`null\` the actual, variance, and percent are all \`null\` so a client can render a dash. Either way \`hasActual\` says which happened, so a logged 0 is never confused with nothing logged.
+**Missing spend** follow \`?missingSpend=\`. Under \`zero\` (the default) a month with a target and nothing logged reports spend of 0 and a variance of the whole target. Under \`null\` the spend, variance, and percent are all \`null\` so a client can render a dash. Either way \`hasSpend\` says which happened, so a logged 0 is never confused with nothing logged.
 
 **Totals cover the whole range, not the page.** They are computed in the same database pass as the rows, so the summary cannot disagree with the table beneath it or shift when the reader turns a page.`,
   })
   @ApiOkResponse({ description: 'The report.', type: ReportResponseDTO })
   @ApiBadRequestResponse({ description: 'The range ends before it starts, or a month is malformed.', type: ErrorResponseDTO })
-  async planVsActual(@CurrentUser() user: IAuthenticatedUser, @Query() query: ReportQueryDTO): Promise<ReportResponseDTO> {
-    return await this.reportsService.planVsActual(user.userId, query);
+  async planVsSpend(@CurrentUser() user: IAuthenticatedUser, @Query() query: ReportQueryDTO): Promise<ReportResponseDTO> {
+    return await this.reportsService.planVsSpend(user.userId, query);
   }
 
   /**
@@ -66,7 +66,7 @@ export class ReportsController {
    * @param query - The range, filters, and axis.
    * @returns The points, in axis order.
    */
-  @Get('plan-vs-actual/series')
+  @Get('plan-vs-spend/series')
   @Throttle({ default: { limit: REPORT_THROTTLE_LIMIT, ttl: EXPENSIVE_THROTTLE_TTL_MS } })
   @ApiOperation({
     summary: 'The same numbers, shaped for a chart',
@@ -89,7 +89,7 @@ It shares the aggregation with the table rather than reimplementing it, so a cha
    * @param query - The range and filters.
    * @param response - The HTTP response, so the file headers can be set.
    */
-  @Get('plan-vs-actual/export')
+  @Get('plan-vs-spend/export')
   @Throttle({ default: { limit: REPORT_THROTTLE_LIMIT, ttl: EXPENSIVE_THROTTLE_TTL_MS } })
   @ApiProduces('text/csv')
   @ApiOperation({

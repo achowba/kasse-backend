@@ -1,5 +1,5 @@
 import { PipelineStage } from 'mongoose';
-import { MissingActualPolicyEnum, PERCENT_DECIMAL_PLACES } from '@common/money';
+import { MissingSpendPolicyEnum, PERCENT_DECIMAL_PLACES } from '@common/money';
 
 /** The factor two decimal places rounds against. */
 const PERCENT_FACTOR = 10 ** PERCENT_DECIMAL_PLACES;
@@ -64,24 +64,24 @@ const percentOrNull = (variance: object): object => ({
  * @param policy - How to treat a cell with a plan but nothing logged.
  * @returns The stage that adds the three computed fields.
  */
-export const varianceStage = (policy: MissingActualPolicyEnum): PipelineStage.AddFields => {
-  if (policy === MissingActualPolicyEnum.NULL) {
-    const variance = { $subtract: ['$actualMinor', '$planMinor'] };
+export const varianceStage = (policy: MissingSpendPolicyEnum): PipelineStage.AddFields => {
+  if (policy === MissingSpendPolicyEnum.NULL) {
+    const variance = { $subtract: ['$spentMinor', '$planMinor'] };
 
     return {
       $addFields: {
         // Under this policy a cell nobody has reported on reports nothing, so a
         // client can render a dash rather than a number that was never measured.
-        actualMinor: { $cond: { if: '$hasActual', then: '$actualMinor', else: null } },
-        varianceMinor: { $cond: { if: '$hasActual', then: variance, else: null } },
-        variancePercent: { $cond: { if: '$hasActual', then: percentOrNull(variance), else: null } },
+        spentMinor: { $cond: { if: '$hasSpend', then: '$spentMinor', else: null } },
+        varianceMinor: { $cond: { if: '$hasSpend', then: variance, else: null } },
+        variancePercent: { $cond: { if: '$hasSpend', then: percentOrNull(variance), else: null } },
       },
     };
   }
 
-  // Under the default policy a missing actual is zero, and the summed
-  // `actualMinor` is already zero, so the arithmetic needs no special case.
-  const variance = { $subtract: ['$actualMinor', '$planMinor'] };
+  // Under the default policy missing spend is zero, and the summed
+  // `spentMinor` is already zero, so the arithmetic needs no special case.
+  const variance = { $subtract: ['$spentMinor', '$planMinor'] };
 
   return {
     $addFields: {

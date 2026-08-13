@@ -7,17 +7,17 @@ const buildRow = (overrides: Partial<ReportRowDTO> = {}): ReportRowDTO => ({
   categoryName: 'Marketing',
   month: '2026-01',
   planMinor: 500_000,
-  actualMinor: 480_000,
+  spentMinor: 480_000,
   varianceMinor: -20_000,
   variancePercent: -4,
   hasPlan: true,
-  hasActual: true,
+  hasSpend: true,
   ...overrides,
 });
 
 const totals: ReportTotalsDTO = {
   planMinor: 500_000,
-  actualMinor: 480_000,
+  spentMinor: 480_000,
   varianceMinor: -20_000,
   variancePercent: -4,
 };
@@ -36,7 +36,7 @@ const lines = (csv: string): string[] =>
 
 describe('renderReportCsv', () => {
   it('writes a header a spreadsheet can label columns from', () => {
-    expect(lines(renderReportCsv([buildRow()], totals))[0]).toBe('Category,Month,Plan,Actual,Variance,Variance %');
+    expect(lines(renderReportCsv([buildRow()], totals))[0]).toBe('Category,Month,Plan,Spent,Variance,Variance %');
   });
 
   it('writes amounts in major units, as a person would', () => {
@@ -71,9 +71,9 @@ describe('renderReportCsv', () => {
     expect(rendered[1]).not.toContain('Infinity');
   });
 
-  it('writes a dash for an actual that was never logged', () => {
+  it('writes a dash for spend that was never logged', () => {
     const rendered = lines(
-      renderReportCsv([buildRow({ actualMinor: null, varianceMinor: null, variancePercent: null, hasActual: false })], totals),
+      renderReportCsv([buildRow({ spentMinor: null, varianceMinor: null, variancePercent: null, hasSpend: false })], totals),
     );
 
     expect(rendered[1]).toBe('Marketing,2026-01,5000.00,-,-,-');
@@ -86,7 +86,7 @@ describe('renderReportCsv', () => {
   });
 
   it('renders a negative amount with its sign rather than in brackets', () => {
-    const rendered = lines(renderReportCsv([buildRow({ actualMinor: -25_000, varianceMinor: -525_000 })], totals));
+    const rendered = lines(renderReportCsv([buildRow({ spentMinor: -25_000, varianceMinor: -525_000 })], totals));
 
     // Accounting brackets are a display convention a spreadsheet would read as
     // text. The minus sign keeps the column numeric.
@@ -94,7 +94,7 @@ describe('renderReportCsv', () => {
   });
 
   it('renders an empty report as a header and a totals row', () => {
-    const rendered = lines(renderReportCsv([], { planMinor: 0, actualMinor: 0, varianceMinor: 0, variancePercent: null }));
+    const rendered = lines(renderReportCsv([], { planMinor: 0, spentMinor: 0, varianceMinor: 0, variancePercent: null }));
 
     expect(rendered).toHaveLength(2);
     expect(rendered[1]).toBe('Total,,0.00,0.00,0.00,-');

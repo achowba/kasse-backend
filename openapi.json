@@ -1601,7 +1601,7 @@
         ]
       },
       "delete": {
-        "description": "Removes an expense, so it no longer counts toward the actual figure for its category and month.\n\nThe delete is soft. The audit trail keeps what the expense was, so a report run before the deletion can still be explained.\n\nRejected with `423` when the expense's month is closed.",
+        "description": "Removes an expense, so it no longer counts toward the spend figure for its category and month.\n\nThe delete is soft. The audit trail keeps what the expense was, so a report run before the deletion can still be explained.\n\nRejected with `423` when the expense's month is closed.",
         "operationId": "ExpensesController_remove_v1",
         "parameters": [
           {
@@ -1665,10 +1665,10 @@
         ]
       }
     },
-    "/api/v1/reports/plan-vs-actual": {
+    "/api/v1/reports/plan-vs-spend": {
       "get": {
-        "description": "One row per category and month in the range, with the target, what was spent, and the difference.\n\n**Variance** is `actual - plan`, so a negative number means under plan. **Variance percent** is `(actual - plan) / plan * 100` to two decimal places.\n\n**When the plan is 0, `variancePercent` is `null`.** Never `NaN`, never `Infinity`, and never a fabricated 100%. Dividing by zero has no answer, and a client renders `N/A`. The absolute `varianceMinor` is still correct and still worth showing: it is the whole of the unplanned spend.\n\n**A category with spend but no plan still appears.** That row is unplanned spend, which is usually the most interesting line in the report, and a naive join from the plan side would silently drop it.\n\n**Missing actuals** follow `?missingActuals=`. Under `zero` (the default) a month with a target and nothing logged reports an actual of 0 and a variance of the whole target. Under `null` the actual, variance, and percent are all `null` so a client can render a dash. Either way `hasActual` says which happened, so a logged 0 is never confused with nothing logged.\n\n**Totals cover the whole range, not the page.** They are computed in the same database pass as the rows, so the summary cannot disagree with the table beneath it or shift when the reader turns a page.",
-        "operationId": "ReportsController_planVsActual_v1",
+        "description": "One row per category and month in the range, with the target, what was spent, and the difference.\n\n**Variance** is `spend - plan`, so a negative number means under plan. **Variance percent** is `(spend - plan) / plan * 100` to two decimal places.\n\n**When the plan is 0, `variancePercent` is `null`.** Never `NaN`, never `Infinity`, and never a fabricated 100%. Dividing by zero has no answer, and a client renders `N/A`. The absolute `varianceMinor` is still correct and still worth showing: it is the whole of the unplanned spend.\n\n**A category with spend but no plan still appears.** That row is unplanned spend, which is usually the most interesting line in the report, and a naive join from the plan side would silently drop it.\n\n**Missing spend** follow `?missingSpend=`. Under `zero` (the default) a month with a target and nothing logged reports spend of 0 and a variance of the whole target. Under `null` the spend, variance, and percent are all `null` so a client can render a dash. Either way `hasSpend` says which happened, so a logged 0 is never confused with nothing logged.\n\n**Totals cover the whole range, not the page.** They are computed in the same database pass as the rows, so the summary cannot disagree with the table beneath it or shift when the reader turns a page.",
+        "operationId": "ReportsController_planVsSpend_v1",
         "parameters": [
           {
             "name": "limit",
@@ -1741,10 +1741,10 @@
             }
           },
           {
-            "name": "missingActuals",
+            "name": "missingSpend",
             "required": false,
             "in": "query",
-            "description": "How to report a category and month with a target but nothing logged. `zero` treats it as 0 spent, so the variance is the whole target. `null` reports the actual, variance, and percent as null, so a client can render a dash.",
+            "description": "How to report a category and month with a target but nothing logged. `zero` treats it as 0 spent, so the variance is the whole target. `null` reports the spend, variance, and percent as null, so a client can render a dash.",
             "schema": {
               "default": "zero",
               "type": "string",
@@ -1792,13 +1792,13 @@
             "bearer": []
           }
         ],
-        "summary": "Plan against actual, with variance",
+        "summary": "Plan against spend, with variance",
         "tags": [
           "Reports"
         ]
       }
     },
-    "/api/v1/reports/plan-vs-actual/series": {
+    "/api/v1/reports/plan-vs-spend/series": {
       "get": {
         "description": "Collapses the report onto one axis: `groupBy=month` gives a point per month summed across categories, `groupBy=category` gives a point per category summed across the range.\n\nUnpaginated, deliberately. A chart needs every point in the range, and one rebuilt from a page of table rows would draw a line that stops partway through the year.\n\nIt shares the aggregation with the table rather than reimplementing it, so a chart and the table beside it cannot disagree.",
         "operationId": "ReportsController_series_v1",
@@ -1908,7 +1908,7 @@
         ]
       }
     },
-    "/api/v1/reports/plan-vs-actual/export": {
+    "/api/v1/reports/plan-vs-spend/export": {
       "get": {
         "description": "The same report as a file, with a labelled totals row appended.\n\nAmounts are written in major units the way a person writes them, `4800.00`, with no currency symbol and no thousands separator, so a spreadsheet reads the column as a number rather than as text.\n\nA variance percentage with no answer, which is what a plan of zero produces, is written as `-` rather than as `NaN` or left blank. A blank cell reads as missing data; a dash reads as deliberate.\n\nBuilt from the same call that serves the JSON report, so the file and the table on screen cannot disagree, and a download straight after viewing is served from the same cached result.",
         "operationId": "ReportsController_exportCsv_v1",
@@ -1984,10 +1984,10 @@
             }
           },
           {
-            "name": "missingActuals",
+            "name": "missingSpend",
             "required": false,
             "in": "query",
-            "description": "How to report a category and month with a target but nothing logged. `zero` treats it as 0 spent, so the variance is the whole target. `null` reports the actual, variance, and percent as null, so a client can render a dash.",
+            "description": "How to report a category and month with a target but nothing logged. `zero` treats it as 0 spent, so the variance is the whole target. `null` reports the spend, variance, and percent as null, so a client can render a dash.",
             "schema": {
               "default": "zero",
               "type": "string",
@@ -2270,7 +2270,7 @@
     },
     "/api/v1/reports/nl-query": {
       "post": {
-        "description": "Turns a question such as \"how did marketing do in Q1 2026\" into a report filter, runs it, and returns both.\n\n**The model never writes a query.** It is given exactly one tool whose schema is a report filter: a month range, some category names, and a policy. It cannot express a collection, a field, an operator, or a database, it never sees a connection string, and the names it may choose from are this account's own categories. Whatever it returns is then validated by the same DTO a hand written report request goes through, and executed by the same report service.\n\nThat means this endpoint cannot reach anything `GET /reports/plan-vs-actual` could not, whatever the model returns. A model that answers with nonsense produces a validation error, not a query.\n\n**The filter comes back with the data.** A user has to be able to see that \"last quarter\" was read as the months they meant, and an answer with no visible interpretation is one the reader has to trust blindly.\n\nReturns `503` when the deployment has no `ANTHROPIC_API_KEY`, and `502` when the model is unreachable or does not produce a usable filter. Every other endpoint works either way, so the report is always available directly.",
+        "description": "Turns a question such as \"how did marketing do in Q1 2026\" into a report filter, runs it, and returns both.\n\n**The model never writes a query.** It is given exactly one tool whose schema is a report filter: a month range, some category names, and a policy. It cannot express a collection, a field, an operator, or a database, it never sees a connection string, and the names it may choose from are this account's own categories. Whatever it returns is then validated by the same DTO a hand written report request goes through, and executed by the same report service.\n\nThat means this endpoint cannot reach anything `GET /reports/plan-vs-spend` could not, whatever the model returns. A model that answers with nonsense produces a validation error, not a query.\n\n**The filter comes back with the data.** A user has to be able to see that \"last quarter\" was read as the months they meant, and an answer with no visible interpretation is one the reader has to trust blindly.\n\nReturns `503` when the deployment has no `ANTHROPIC_API_KEY`, and `502` when the model is unreachable or does not produce a usable filter. Every other endpoint works either way, so the report is always available directly.",
         "operationId": "NlQueryController_ask_v1",
         "parameters": [],
         "requestBody": {
@@ -2678,8 +2678,8 @@
     }
   },
   "info": {
-    "title": "Plan vs Actual API",
-    "description": "Monthly spending targets, logged expenses, and variance reporting with locked periods.\n\n**Money** is an integer count of minor units. A field ending in `Minor` holds cents.\n\n**Months** are the string `YYYY-MM`.\n\n**Variance** is `actual - plan`. Variance percent is `null` when the plan is zero, never `NaN`.\n\n**Missing actuals** default to `0`. Pass `missingActuals=null` to receive `null` instead. Every report row carries `hasActual`, so a logged zero is never confused with nothing logged.\n\n**Locked periods** reject writes with `423` and the code `PERIOD_LOCKED`.\n\n**Deletes are soft.** A `DELETE` answers `204` and the record stops appearing in reads.\n\n**Sessions** travel in the `Authorization` header, never a cookie, so a mobile or desktop client is a first class caller. Access tokens are RS256 signed and short lived; refresh tokens are opaque, single use, and rotate.",
+    "title": "Kasse API",
+    "description": "Monthly spending targets, logged expenses, and variance reporting with locked periods.\n\n**Money** is an integer count of minor units. A field ending in `Minor` holds cents.\n\n**Months** are the string `YYYY-MM`.\n\n**Variance** is `spend - plan`. Variance percent is `null` when the plan is zero, never `NaN`.\n\n**Missing spend** default to `0`. Pass `missingSpend=null` to receive `null` instead. Every report row carries `hasSpend`, so a logged zero is never confused with nothing logged.\n\n**Locked periods** reject writes with `423` and the code `PERIOD_LOCKED`.\n\n**Deletes are soft.** A `DELETE` answers `204` and the record stops appearing in reads.\n\n**Sessions** travel in the `Authorization` header, never a cookie, so a mobile or desktop client is a first class caller. Access tokens are RS256 signed and short lived; refresh tokens are opaque, single use, and rotate.",
     "version": "1.0.0",
     "contact": {}
   },
@@ -3363,7 +3363,7 @@
             "description": "The target, in minor units.",
             "example": 500000
           },
-          "actualMinor": {
+          "spentMinor": {
             "type": "object",
             "description": "Logged spend, in minor units. Null only when nothing was logged and the policy is `null`.",
             "example": 480000,
@@ -3371,7 +3371,7 @@
           },
           "varianceMinor": {
             "type": "object",
-            "description": "Actual minus plan. Negative means under plan.",
+            "description": "Spend minus plan. Negative means under plan.",
             "example": -20000,
             "nullable": true
           },
@@ -3386,7 +3386,7 @@
             "description": "Whether a target exists. A target of 0 is not the same as no target.",
             "example": true
           },
-          "hasActual": {
+          "hasSpend": {
             "type": "boolean",
             "description": "Whether anything was logged. Logged 0 is not the same as nothing logged.",
             "example": true
@@ -3398,7 +3398,7 @@
           "month",
           "planMinor",
           "hasPlan",
-          "hasActual"
+          "hasSpend"
         ]
       },
       "ReportTotalsDTO": {
@@ -3409,14 +3409,14 @@
             "description": "Every target in range, in minor units.",
             "example": 2500000
           },
-          "actualMinor": {
+          "spentMinor": {
             "type": "number",
             "description": "Every expense in range, in minor units.",
             "example": 2530000
           },
           "varianceMinor": {
             "type": "number",
-            "description": "Actual minus plan across the range.",
+            "description": "Spend minus plan across the range.",
             "example": 30000
           },
           "variancePercent": {
@@ -3428,7 +3428,7 @@
         },
         "required": [
           "planMinor",
-          "actualMinor",
+          "spentMinor",
           "varianceMinor"
         ]
       },
@@ -3508,14 +3508,14 @@
             "description": "Planned, summed for this point.",
             "example": 2500000
           },
-          "actualMinor": {
+          "spentMinor": {
             "type": "number",
             "description": "Logged, summed for this point.",
             "example": 2530000
           },
           "varianceMinor": {
             "type": "number",
-            "description": "Actual minus plan for this point.",
+            "description": "Spend minus plan for this point.",
             "example": 30000
           }
         },
@@ -3523,7 +3523,7 @@
           "key",
           "label",
           "planMinor",
-          "actualMinor",
+          "spentMinor",
           "varianceMinor"
         ]
       },
@@ -3677,7 +3677,7 @@
               "type": "string"
             }
           },
-          "missingActuals": {
+          "missingSpend": {
             "type": "string",
             "description": "The policy applied to months with nothing logged.",
             "enum": [
