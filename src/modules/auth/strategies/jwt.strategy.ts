@@ -58,6 +58,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Malformed access token subject.');
     }
 
-    return { userId: new Types.ObjectId(payload.sub) };
+    return { userId: new Types.ObjectId(payload.sub), email: payload.email };
   }
 }

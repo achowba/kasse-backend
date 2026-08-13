@@ -9,11 +9,19 @@ import { MILLISECONDS_PER_DAY, MILLISECONDS_PER_SECOND, REFRESH_TOKEN_BYTES } fr
 /**
  * The claims carried by an access token.
  *
+ * The address is carried so a request can be attributed to an account in a
+ * log line without a database read. It is **not** authorisation: nothing is
+ * decided from it, every query is scoped by `sub`, and a token issued before
+ * an address changed would carry the old one until it expires, which is
+ * minutes. Read it as "the address this account had when it signed in".
+ *
  * @property sub - The account the token authenticates, as a string.
+ * @property email - The account's address when the token was issued.
  * @property exp - Expiry, in seconds since the epoch. Set by the signer.
  */
 export interface IAccessTokenPayload {
   sub: string;
+  email: string;
   exp?: number;
 }
 
@@ -67,10 +75,11 @@ export class TokenService {
    * the token actually carries.
    *
    * @param userId - The account to authenticate.
+   * @param email - The account's address, carried for attribution rather than authorisation.
    * @returns The token and how long it is good for.
    */
-  async issueAccessToken(userId: Types.ObjectId): Promise<IIssuedAccessToken> {
-    const accessToken = await this.jwtService.signAsync({ sub: userId.toString() });
+  async issueAccessToken(userId: Types.ObjectId, email: string): Promise<IIssuedAccessToken> {
+    const accessToken = await this.jwtService.signAsync({ sub: userId.toString(), email });
     const decoded = this.jwtService.decode<IAccessTokenPayload | null>(accessToken);
     const expirySeconds = decoded?.exp ?? 0;
     const nowSeconds = Math.floor(Date.now() / MILLISECONDS_PER_SECOND);

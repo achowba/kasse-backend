@@ -1,6 +1,7 @@
 import { IncomingMessage } from 'node:http';
 import { Socket } from 'node:net';
 import { Types } from 'mongoose';
+import { logUser } from './log-context';
 import { buildRequestProps, redactEntry, redactValue } from './logger.format';
 import {
   CIRCULAR_PLACEHOLDER,
@@ -246,5 +247,102 @@ describe('buildRequestProps', () => {
 
     // A log line must never be the thing that breaks a request.
     expect(() => JSON.stringify(propsFor(body))).not.toThrow();
+  });
+
+  describe('identifying the account', () => {
+    /**
+     * Builds the props for a request the guard has authenticated.
+     *
+     * @param user - Whatever the guard attached, valid or not.
+     * @returns The extra fields stamped on that request's log line.
+     */
+    const propsForUser = (user: unknown): Record<string, unknown> => {
+      const request: IncomingMessage & { user?: unknown } = new IncomingMessage(new Socket());
+
+      request.method = 'GET';
+      request.url = '/api/v1/reports/plan-vs-spend';
+      request.user = user;
+
+      return buildRequestProps(request);
+    };
+
+    it('carries the account id, so every line for one account can be selected', () => {
+      const userId = new Types.ObjectId();
+
+      expect(propsForUser({ userId })['user']).toEqual({ id: userId.toHexString() });
+    });
+
+    it('accepts an id that is already a string', () => {
+      expect(propsForUser({ userId: '6a7e25c9875401477a4b86c4' })['user']).toEqual({ id: '6a7e25c9875401477a4b86c4' });
+    });
+
+    it('carries the address the token was issued with', () => {
+      const userId = new Types.ObjectId();
+
+      // It rides in the token rather than being looked up, so a request line can
+      // name the account without adding a database read to every request.
+      expect(propsForUser({ userId, email: 'demo@kasse.app' })['user']).toEqual({
+        id: userId.toHexString(),
+        email: 'demo@kasse.app',
+      });
+    });
+
+    it('carries the id alone when the token predates the address claim', () => {
+      // A token signed before this change has no email. It stays valid until it
+      // expires, so the line has to work without one rather than break.
+      expect(propsForUser({ userId: new Types.ObjectId() })['user']).not.toHaveProperty('email');
+    });
+
+    it('ignores an address that is not a string', () => {
+      const userId = new Types.ObjectId();
+
+      expect(propsForUser({ userId, email: { nested: true } })['user']).toEqual({ id: userId.toHexString() });
+    });
+
+    it('omits the user entirely on an unauthenticated request', () => {
+      // A public route, a missing token, and a rejected one all land here, and
+      // all three still produce a log line.
+      expect(propsFor()).not.toHaveProperty('user');
+    });
+
+    it.each([
+      ['something that is not an object', 'not-a-user'],
+      ['an object with no id on it', { email: 'demo@kasse.app' }],
+      ['an id that would stringify to nonsense', { userId: { nested: true } }],
+    ])('omits the user for %s rather than logging a useless value', (_label: string, user: unknown) => {
+      // `[object Object]` is worse than no id: it looks like one, it groups
+      // every account together, and it would be believed.
+      expect(propsForUser(user)).not.toHaveProperty('user');
+    });
+
+    it('still carries the context and the body alongside the user', () => {
+      const request: IncomingMessage & { user?: unknown; body?: unknown } = new IncomingMessage(new Socket());
+      const userId = new Types.ObjectId();
+
+      request.user = { userId };
+      request.body = { month: '2026-03' };
+
+      const props = buildRequestProps(request);
+
+      expect(props['context']).toBe(REQUEST_LOG_CONTEXT);
+      expect(props['user']).toEqual({ id: userId.toHexString() });
+      expect(props['requestBody']).toEqual({ month: '2026-03' });
+    });
+  });
+});
+
+describe('logUser', () => {
+  it('omits the email rather than carrying an undefined key', () => {
+    expect(logUser('abc123')).toEqual({ user: { id: 'abc123' } });
+  });
+
+  it('includes the email where the account was already loaded', () => {
+    expect(logUser('abc123', 'demo@kasse.app')).toEqual({ user: { id: 'abc123', email: 'demo@kasse.app' } });
+  });
+
+  it('produces the same key everywhere, which is the point of it', () => {
+    // A line saying `userId` and another saying `user.id` cannot be selected by
+    // one query, so a search for an account silently returns half its activity.
+    expect(Object.keys(logUser('abc123'))).toEqual(['user']);
   });
 });

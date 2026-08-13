@@ -32,6 +32,24 @@ Nest applies the global prefix to a middleware path, so `LoggerModule`'s own reg
 
 Without `useExisting` both instances log every `/api` request, because **`pino-http` sets no marker for a request it has already handled**. The two lines are near identical, and the only tell is that the second has been through routing and so carries `params`.
 
+## Every line names the account
+
+A log line about a request carries the account it belongs to, in one shape:
+
+```json
+"user": { "id": "6a7e25c9875401477a4b86c4", "email": "demo@kasse.app" }
+```
+
+One shape, everywhere, because the point of it is filtering. A line saying `userId` and another saying `user.id` cannot be selected by the same query, so a search for one account silently returns half its activity, which is worse than returning none: it looks like an answer. `logUser` builds it, and every call site uses it rather than assembling the fields by hand.
+
+The address rides in the access token rather than being looked up. Loading the account on every request to name it in a log would add a database read to the hot path, which is the thing stateless verification exists to avoid. It is **attribution, never authorisation**: nothing is decided from it, every query is scoped by the account id, and a token issued before an address changed carries the old one until it expires.
+
+`buildRequestProps` reads the request structurally rather than importing the auth types. This module is a leaf that everything logging depends on, and giving it an import from a feature module for one property name is how a cycle starts.
+
+An unauthenticated request carries no `user` at all. A public route, a missing token, and a rejected one all land there, and all three are still logged.
+
+The identifier is narrowed to an `ObjectId` or a string rather than stringified loosely. Anything else reaching `String()` logs `[object Object]`, which is worse than logging nothing: it looks like an identifier, it groups every account under one value, and it would be believed.
+
 ## Redaction happens twice, on purpose
 
 Two mechanisms, and neither replaces the other.

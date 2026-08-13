@@ -2,6 +2,7 @@ import { ConflictException, Injectable, Logger, NotFoundException, UnauthorizedE
 import { InjectConnection } from '@nestjs/mongoose';
 import { ClientSession, Connection, Types } from 'mongoose';
 import { withTransaction } from '@common/database';
+import { logUser } from '@common/logging';
 import { AuditActionEnum, AuditEntityEnum, AuditLogService } from '@modules/audit-log';
 import { UserDocument, UserResponseDTO, UsersService } from '@modules/users';
 import { INVALID_CREDENTIALS } from './auth.constants';
@@ -68,7 +69,7 @@ export class AuthService {
     const passwordHash = await this.passwordService.hash(credentials.password);
     const user = await this.usersService.create(credentials.email, passwordHash);
 
-    this.logger.log({ userId: user._id.toString() }, 'account created');
+    this.logger.log(logUser(user._id.toString(), user.email), 'account created');
 
     return await this.establishSession(user);
   }
@@ -105,7 +106,7 @@ export class AuthService {
     }
 
     if (!(await this.passwordService.verify(user.passwordHash, credentials.password))) {
-      this.logger.log({ userId: user._id.toString() }, 'login rejected: wrong password');
+      this.logger.log(logUser(user._id.toString(), user.email), 'login rejected: wrong password');
 
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
@@ -148,7 +149,7 @@ export class AuthService {
       const revokedCount = await this.refreshTokensRepository.revokeFamily(record.userId, record.familyId);
 
       this.logger.warn(
-        { userId: record.userId.toString(), revokedCount },
+        { ...logUser(record.userId.toString()), revokedCount },
         'refresh token reuse detected, revoked the whole token family',
       );
 
@@ -237,7 +238,7 @@ export class AuthService {
   async revokeAllSessions(userId: Types.ObjectId): Promise<number> {
     const revokedCount = await this.refreshTokensRepository.revokeAll(userId);
 
-    this.logger.log({ userId: userId.toString(), revokedCount }, 'all sessions revoked');
+    this.logger.log({ ...logUser(userId.toString()), revokedCount }, 'all sessions revoked');
 
     return revokedCount;
   }
@@ -283,7 +284,7 @@ export class AuthService {
     const user = await this.usersService.getById(userId);
 
     if (!(await this.passwordService.verify(user.passwordHash, input.currentPassword))) {
-      this.logger.log({ userId: userId.toString() }, 'password change rejected: wrong current password');
+      this.logger.log(logUser(userId.toString(), user.email), 'password change rejected: wrong current password');
 
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
@@ -292,7 +293,7 @@ export class AuthService {
 
     const revokedCount = await this.refreshTokensRepository.revokeAll(userId);
 
-    this.logger.log({ userId: userId.toString(), revokedCount }, 'password changed, sessions revoked');
+    this.logger.log({ ...logUser(userId.toString(), user.email), revokedCount }, 'password changed, sessions revoked');
 
     this.auditLogService.record({
       userId,
@@ -328,7 +329,7 @@ export class AuthService {
     familyId?: Types.ObjectId,
     session?: ClientSession,
   ): Promise<AuthResponseDTO> {
-    const { accessToken, expiresIn } = await this.tokenService.issueAccessToken(user._id);
+    const { accessToken, expiresIn } = await this.tokenService.issueAccessToken(user._id, user.email);
     const refresh = this.tokenService.createRefreshToken();
 
     await this.refreshTokensRepository.issue(

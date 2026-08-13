@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import { CacheModule } from '@common/cache';
 import { appConfig, authConfig, databaseConfig, validateEnvironment } from '@common/config';
 import { DatabaseModule } from '@common/database';
+import { logUser } from '@common/logging';
 import { SeedModule } from './seed.module';
 import { SeedService } from './seed.service';
 
@@ -66,7 +67,7 @@ const run = async (): Promise<void> => {
     // time the context is up the categories these seeders resolve already exist.
     const userId = which === 'spec' ? await seedService.seedSpec() : await seedService.seedDemo();
 
-    logger.log({ seeder: which, userId: userId.toString() }, 'seeding finished');
+    logger.log({ seeder: which, ...logUser(userId.toString()) }, 'seeding finished');
   } catch (error: unknown) {
     logger.error({ err: error }, 'seeding failed');
     process.exitCode = 1;

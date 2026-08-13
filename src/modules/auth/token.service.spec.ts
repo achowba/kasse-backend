@@ -26,18 +26,21 @@ describe('TokenService', () => {
   });
 
   describe('issueAccessToken', () => {
-    it('signs the account id as the subject', async () => {
+    it('signs the account id as the subject, with the address alongside it', async () => {
       const userId = new Types.ObjectId();
 
-      await service.issueAccessToken(userId);
+      await service.issueAccessToken(userId, 'demo@kasse.app');
 
-      expect(jwtService.signAsync).toHaveBeenCalledWith({ sub: userId.toString() });
+      // The address is attribution, not authorisation. It lets a log line name
+      // the account without a database read; every query is still scoped by the
+      // subject.
+      expect(jwtService.signAsync).toHaveBeenCalledWith({ sub: userId.toString(), email: 'demo@kasse.app' });
     });
 
     it('reports the lifetime from the signed token rather than from configuration', async () => {
       // Reading it back from the token is what stops the number a client is given
       // drifting from the claim the token actually carries.
-      const { expiresIn } = await service.issueAccessToken(new Types.ObjectId());
+      const { expiresIn } = await service.issueAccessToken(new Types.ObjectId(), 'demo@kasse.app');
 
       expect(expiresIn).toBeGreaterThan(880);
       expect(expiresIn).toBeLessThanOrEqual(900);
@@ -46,7 +49,7 @@ describe('TokenService', () => {
     it('reports zero rather than a negative lifetime when the token carries no expiry', async () => {
       jwtService.decode.mockReturnValue({ sub: 'user' });
 
-      await expect(service.issueAccessToken(new Types.ObjectId())).resolves.toMatchObject({ expiresIn: 0 });
+      await expect(service.issueAccessToken(new Types.ObjectId(), 'demo@kasse.app')).resolves.toMatchObject({ expiresIn: 0 });
     });
   });
 

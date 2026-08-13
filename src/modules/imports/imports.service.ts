@@ -4,6 +4,7 @@ import { ClientSession, Connection, Types } from 'mongoose';
 import { DataVersionService } from '@common/cache';
 import { DUPLICATE_KEY_ERROR, withTransaction } from '@common/database';
 import { AppException, ErrorCodeEnum } from '@common/errors';
+import { logUser } from '@common/logging';
 import { IPaginatedResponse, PaginationQueryDTO, toPaginatedResponse } from '@common/pagination';
 import { AuditActionEnum, AuditEntityEnum, AuditLogService } from '@modules/audit-log';
 import { CategoriesService } from '@modules/categories';
@@ -98,7 +99,7 @@ export class ImportsService {
     const replayed = await this.importsRepository.findByIdempotencyKey(userId, idempotencyKey);
 
     if (replayed !== null) {
-      this.logger.log({ userId: userId.toString(), idempotencyKey }, 'import replayed, returning the original batch');
+      this.logger.log({ ...logUser(userId.toString()), idempotencyKey }, 'import replayed, returning the original batch');
 
       return ImportBatchResponseDTO.fromDocument(replayed);
     }
@@ -271,7 +272,7 @@ export class ImportsService {
       expenseCount: 0,
     });
 
-    this.logger.log({ userId: userId.toString(), rowCount, errorCount: errors.length }, 'import rejected, nothing written');
+    this.logger.log({ ...logUser(userId.toString()), rowCount, errorCount: errors.length }, 'import rejected, nothing written');
 
     return ImportBatchResponseDTO.fromDocument(batch);
   }
@@ -340,7 +341,7 @@ export class ImportsService {
       });
 
       this.dataVersionService.bump(userId);
-      this.logger.log({ userId: userId.toString(), rowCount, batchId: batch._id.toString() }, 'import committed');
+      this.logger.log({ ...logUser(userId.toString()), rowCount, batchId: batch._id.toString() }, 'import committed');
 
       return ImportBatchResponseDTO.fromDocument(batch);
     } catch (error: unknown) {
