@@ -25,7 +25,7 @@ import { PeriodLocksService } from './period-locks.service';
  *
  * @remarks
  * Locking is enforced in the service layer, not here. Every write to a plan or
- * an actual, including every row of a CSV import, passes through the same gate,
+ * an expense, including every row of a CSV import, passes through the same gate,
  * so hiding a button in a client is not what makes a period read only.
  */
 @ApiTags('Period locks')
@@ -69,13 +69,13 @@ The absence of a month from this list is what "open" means. There is no unlocked
   @Post()
   @ApiOperation({
     summary: 'Close periods',
-    description: `Closes months so their plans and actuals become read only.
+    description: `Closes months so their plans and expenses become read only.
 
 Supply either \`months\` or \`quarter\`. A quarter expands to its three calendar months, so the stored shape is always one record per month and a single month of a closed quarter can be reopened without a special case.
 
 Closing an already closed month is harmless: it is skipped and its original time is preserved, so locking a quarter that overlaps a month closed earlier does not rewrite when that happened. The response lists only the months this call actually closed.
 
-Afterwards, any attempt to create, change, or delete a plan or an actual in those months is rejected with \`423\` and the code \`PERIOD_LOCKED\`, including rows inside a CSV import. Moving a record out of a closed month is rejected too, because that changes the closed month's totals.`,
+Afterwards, any attempt to create, change, or delete a plan or an expense in those months is rejected with \`423\` and the code \`PERIOD_LOCKED\`, including rows inside a CSV import. Moving a record out of a closed month is rejected too, because that changes the closed month's totals.`,
   })
   @ApiCreatedResponse({ description: 'The months this call closed. Already closed months are omitted.', type: [String] })
   @ApiBadRequestResponse({
@@ -102,7 +102,7 @@ Afterwards, any attempt to create, change, or delete a plan or an actual in thos
   @ApiParam({ name: 'month', description: 'The month to reopen, as YYYY-MM.', example: '2026-01' })
   @ApiOperation({
     summary: 'Reopen a period',
-    description: `Reopens a single month, making its plans and actuals editable again.
+    description: `Reopens a single month, making its plans and expenses editable again.
 
 Reopening is recorded in the audit log, with the month and the request that did it, so a period that was closed and then reopened leaves a trail rather than looking as though it was never closed.
 

@@ -40,7 +40,7 @@ describe('PlansService', () => {
 
     periodLocks = { assertUnlocked: jest.fn().mockResolvedValue(undefined) };
     categories = { getVisibleById: jest.fn().mockResolvedValue({ _id: categoryId }) };
-    auditLog = { record: jest.fn().mockResolvedValue(undefined) };
+    auditLog = { record: jest.fn() };
 
     service = new PlansService(
       repository as unknown as PlansRepository,

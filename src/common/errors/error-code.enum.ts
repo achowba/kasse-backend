@@ -13,7 +13,7 @@
  * @property NOT_FOUND - No such record, or it is not owned by the caller.
  * @property CONFLICT - The write conflicts with a record that already exists.
  * @property IMPORT_VALIDATION_FAILED - A CSV upload was well formed but its rows were rejected.
- * @property PERIOD_LOCKED - The period is locked, so its plans and actuals are read only.
+ * @property PERIOD_LOCKED - The period is locked, so its plans and expenses are read only.
  * @property RATE_LIMITED - Too many requests from this caller.
  * @property INTERNAL - An unexpected failure. The response carries no internal detail.
  */

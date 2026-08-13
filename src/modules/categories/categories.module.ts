@@ -10,7 +10,7 @@ import { Category, CategorySchema } from './schemas/category.schema';
  * Spending categories: the shared catalogue and each account's own.
  *
  * @remarks
- * Exports {@link CategoriesService} because plans, actuals, and the CSV import
+ * Exports {@link CategoriesService} because plans, expenses, and the CSV import
  * all need to resolve a category and confirm the caller may use it.
  */
 @Module({

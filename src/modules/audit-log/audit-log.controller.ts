@@ -34,7 +34,7 @@ export class AuditLogController {
     summary: 'Read the audit trail',
     description: `Returns changes to this account's financial data, newest first.
 
-Every change to a plan, an actual, a category, or a period lock is recorded with the state before and after, so the trail answers what changed rather than only what the record says now. Because deletes are soft and audited, a deleted record's last known state is still readable here.
+Every change to a plan, an expense, a category, or a period lock is recorded with the state before and after, so the trail answers what changed rather than only what the record says now. Because deletes are soft and audited, a deleted record's last known state is still readable here.
 
 Each entry carries the \`requestId\` of the request that made the change, which matches the \`x-request-id\` response header and the service logs for the same request.
 

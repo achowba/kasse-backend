@@ -52,7 +52,7 @@ export class CategoriesController {
 
 Each entry reports whether it is \`shared\`. A shared category can be selected by any account but cannot be renamed, archived, or deleted, so a client should not offer those actions for it.
 
-Archived categories are excluded by default, because a picker wants only what can be chosen now. Pass \`includeArchived=true\` to see them; they still resolve in existing plans, actuals, and reports.`,
+Archived categories are excluded by default, because a picker wants only what can be chosen now. Pass \`includeArchived=true\` to see them; they still resolve in existing plans, expenses, and reports.`,
   })
   @ApiOkResponse({ description: 'A page of selectable categories.', type: [CategoryResponseDTO] })
   async list(
@@ -108,7 +108,7 @@ Creating a category with the same name as a shared one is allowed. The account's
 
 Only the caller's own categories can be changed. A shared catalogue entry answers 404 rather than explaining the rule, because a client should already know from the \`shared\` flag and there is nothing useful to reveal.
 
-Archiving hides a category from pickers without affecting anything historic: existing plans and actuals keep resolving it and reports are unchanged. It is almost always what someone wants instead of deleting.`,
+Archiving hides a category from pickers without affecting anything historic: existing plans and expenses keep resolving it and reports are unchanged. It is almost always what someone wants instead of deleting.`,
   })
   @ApiOkResponse({ description: 'The updated category.', type: CategoryResponseDTO })
   @ApiNotFoundResponse({ description: 'The caller does not own a category with that id.', type: ErrorResponseDTO })
@@ -138,7 +138,7 @@ Archiving hides a category from pickers without affecting anything historic: exi
     summary: 'Delete a category',
     description: `Removes a category the caller owns from every list.
 
-The delete is soft. The record survives so that plans and actuals in a locked period keep resolving the name they referenced, and so a mistaken delete is recoverable without a database restore. The change is recorded in the audit log with the category's last state.
+The delete is soft. The record survives so that plans and expenses in a locked period keep resolving the name they referenced, and so a mistaken delete is recoverable without a database restore. The change is recorded in the audit log with the category's last state.
 
 Consider archiving instead. Deleting a category that already has spend against it makes those records harder to read, while archiving hides it from pickers and leaves history intact.
 

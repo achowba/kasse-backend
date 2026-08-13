@@ -415,7 +415,7 @@
         ]
       },
       "patch": {
-        "description": "Changes the currency or the month the fiscal year starts in. Both are optional; anything omitted is left alone.\n\nChanging the currency relabels amounts rather than converting them. Amounts are stored as minor units with no currency of their own, so existing plans and actuals keep their numeric value.\n\nThe email address is not changeable here, because it is the login identity and moving it needs a verification flow.",
+        "description": "Changes the currency or the month the fiscal year starts in. Both are optional; anything omitted is left alone.\n\nChanging the currency relabels amounts rather than converting them. Amounts are stored as minor units with no currency of their own, so existing plans and expenses keep their numeric value.\n\nThe email address is not changeable here, because it is the login identity and moving it needs a verification flow.",
         "operationId": "UsersController_updateMe_v1",
         "parameters": [],
         "requestBody": {
@@ -473,7 +473,7 @@
     },
     "/api/v1/audit-log": {
       "get": {
-        "description": "Returns changes to this account's financial data, newest first.\n\nEvery change to a plan, an actual, a category, or a period lock is recorded with the state before and after, so the trail answers what changed rather than only what the record says now. Because deletes are soft and audited, a deleted record's last known state is still readable here.\n\nEach entry carries the `requestId` of the request that made the change, which matches the `x-request-id` response header and the service logs for the same request.\n\nFilter by `entity` and `entityId` to read the history of one record.\n\nThe trail is append only. No route in this API can edit or remove an entry.",
+        "description": "Returns changes to this account's financial data, newest first.\n\nEvery change to a plan, an expense, a category, or a period lock is recorded with the state before and after, so the trail answers what changed rather than only what the record says now. Because deletes are soft and audited, a deleted record's last known state is still readable here.\n\nEach entry carries the `requestId` of the request that made the change, which matches the `x-request-id` response header and the service logs for the same request.\n\nFilter by `entity` and `entityId` to read the history of one record.\n\nThe trail is append only. No route in this API can edit or remove an entry.",
         "operationId": "AuditLogController_list_v1",
         "parameters": [
           {
@@ -509,7 +509,7 @@
               "enum": [
                 "CATEGORY",
                 "PLAN",
-                "ACTUAL",
+                "EXPENSE",
                 "PERIOD_LOCK",
                 "IMPORT_BATCH"
               ]
@@ -529,9 +529,9 @@
                 "PLAN_CREATED",
                 "PLAN_UPDATED",
                 "PLAN_DELETED",
-                "ACTUAL_CREATED",
-                "ACTUAL_UPDATED",
-                "ACTUAL_DELETED",
+                "EXPENSE_CREATED",
+                "EXPENSE_UPDATED",
+                "EXPENSE_DELETED",
                 "PERIOD_LOCKED",
                 "PERIOD_UNLOCKED",
                 "IMPORT_COMPLETED"
@@ -587,7 +587,7 @@
     },
     "/api/v1/categories": {
       "get": {
-        "description": "Returns the caller's own categories together with the shared catalogue, sorted by name.\n\nEach entry reports whether it is `shared`. A shared category can be selected by any account but cannot be renamed, archived, or deleted, so a client should not offer those actions for it.\n\nArchived categories are excluded by default, because a picker wants only what can be chosen now. Pass `includeArchived=true` to see them; they still resolve in existing plans, actuals, and reports.",
+        "description": "Returns the caller's own categories together with the shared catalogue, sorted by name.\n\nEach entry reports whether it is `shared`. A shared category can be selected by any account but cannot be renamed, archived, or deleted, so a client should not offer those actions for it.\n\nArchived categories are excluded by default, because a picker wants only what can be chosen now. Pass `includeArchived=true` to see them; they still resolve in existing plans, expenses, and reports.",
         "operationId": "CategoriesController_list_v1",
         "parameters": [
           {
@@ -719,7 +719,7 @@
     },
     "/api/v1/categories/{categoryId}": {
       "patch": {
-        "description": "Changes the name, the archived state, or both. Anything omitted is left alone.\n\nOnly the caller's own categories can be changed. A shared catalogue entry answers 404 rather than explaining the rule, because a client should already know from the `shared` flag and there is nothing useful to reveal.\n\nArchiving hides a category from pickers without affecting anything historic: existing plans and actuals keep resolving it and reports are unchanged. It is almost always what someone wants instead of deleting.",
+        "description": "Changes the name, the archived state, or both. Anything omitted is left alone.\n\nOnly the caller's own categories can be changed. A shared catalogue entry answers 404 rather than explaining the rule, because a client should already know from the `shared` flag and there is nothing useful to reveal.\n\nArchiving hides a category from pickers without affecting anything historic: existing plans and expenses keep resolving it and reports are unchanged. It is almost always what someone wants instead of deleting.",
         "operationId": "CategoriesController_update_v1",
         "parameters": [
           {
@@ -800,7 +800,7 @@
         ]
       },
       "delete": {
-        "description": "Removes a category the caller owns from every list.\n\nThe delete is soft. The record survives so that plans and actuals in a locked period keep resolving the name they referenced, and so a mistaken delete is recoverable without a database restore. The change is recorded in the audit log with the category's last state.\n\nConsider archiving instead. Deleting a category that already has spend against it makes those records harder to read, while archiving hides it from pickers and leaves history intact.\n\nA shared catalogue entry answers 404.",
+        "description": "Removes a category the caller owns from every list.\n\nThe delete is soft. The record survives so that plans and expenses in a locked period keep resolving the name they referenced, and so a mistaken delete is recoverable without a database restore. The change is recorded in the audit log with the category's last state.\n\nConsider archiving instead. Deleting a category that already has spend against it makes those records harder to read, while archiving hides it from pickers and leaves history intact.\n\nA shared catalogue entry answers 404.",
         "operationId": "CategoriesController_remove_v1",
         "parameters": [
           {
@@ -916,7 +916,7 @@
         ]
       },
       "post": {
-        "description": "Closes months so their plans and actuals become read only.\n\nSupply either `months` or `quarter`. A quarter expands to its three calendar months, so the stored shape is always one record per month and a single month of a closed quarter can be reopened without a special case.\n\nClosing an already closed month is harmless: it is skipped and its original time is preserved, so locking a quarter that overlaps a month closed earlier does not rewrite when that happened. The response lists only the months this call actually closed.\n\nAfterwards, any attempt to create, change, or delete a plan or an actual in those months is rejected with `423` and the code `PERIOD_LOCKED`, including rows inside a CSV import. Moving a record out of a closed month is rejected too, because that changes the closed month's totals.",
+        "description": "Closes months so their plans and expenses become read only.\n\nSupply either `months` or `quarter`. A quarter expands to its three calendar months, so the stored shape is always one record per month and a single month of a closed quarter can be reopened without a special case.\n\nClosing an already closed month is harmless: it is skipped and its original time is preserved, so locking a quarter that overlaps a month closed earlier does not rewrite when that happened. The response lists only the months this call actually closed.\n\nAfterwards, any attempt to create, change, or delete a plan or an expense in those months is rejected with `423` and the code `PERIOD_LOCKED`, including rows inside a CSV import. Moving a record out of a closed month is rejected too, because that changes the closed month's totals.",
         "operationId": "PeriodLocksController_lock_v1",
         "parameters": [],
         "requestBody": {
@@ -977,7 +977,7 @@
     },
     "/api/v1/period-locks/{month}": {
       "delete": {
-        "description": "Reopens a single month, making its plans and actuals editable again.\n\nReopening is recorded in the audit log, with the month and the request that did it, so a period that was closed and then reopened leaves a trail rather than looking as though it was never closed.\n\nA month that is not closed answers 404.",
+        "description": "Reopens a single month, making its plans and expenses editable again.\n\nReopening is recorded in the audit log, with the month and the request that did it, so a period that was closed and then reopened leaves a trail rather than looking as though it was never closed.\n\nA month that is not closed answers 404.",
         "operationId": "PeriodLocksController_unlock_v1",
         "parameters": [
           {
@@ -1345,6 +1345,324 @@
         ]
       }
     },
+    "/api/v1/expenses": {
+      "get": {
+        "description": "Returns expenses, newest month first, optionally filtered by month range, category, or the import that wrote them.\n\nThis is also the report's drill down. A report cell is one category in one month, which is `categoryId` with `from` and `to` set to the same month, so there is no separate drill down endpoint that could disagree with this one.\n\nFiltering by `importBatchId` answers the question a reviewer actually asks after an import, which is what that file put in.",
+        "operationId": "ExpensesController_list_v1",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "How many records to return.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "description": "How many records to skip.",
+            "schema": {
+              "minimum": 0,
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "First month of the range, inclusive.",
+            "schema": {
+              "example": "2026-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Last month of the range, inclusive.",
+            "schema": {
+              "example": "2026-12",
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "description": "Restrict to one category.",
+            "schema": {
+              "example": "65f1c2d3e4b5a6c7d8e9f0a1",
+              "type": "string"
+            }
+          },
+          {
+            "name": "importBatchId",
+            "required": false,
+            "in": "query",
+            "description": "Restrict to the expenses one import wrote.",
+            "schema": {
+              "example": "65f1c2d3e4b5a6c7d8e9f0d1",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of expenses.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExpenseResponseDTO"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List expenses",
+        "tags": [
+          "Expenses"
+        ]
+      },
+      "post": {
+        "description": "Logs one expense against a category and a month.\n\nEach call creates a record. Logging twice against the same category and month is two expenses, not an overwrite, because that is what spending is: a month's total is the sum of its line items. The report adds them up. This is the opposite of a plan, where one category and month hold a single target.\n\nAn expense belongs to a month rather than a date. Nothing here is a timestamp, so no timezone can move spend into the wrong period.\n\nA negative amount is allowed and means money came back, such as a refund or a credit note.\n\nRejected with `423` when the month is closed, and with `404` when the category is not one the caller can use.",
+        "operationId": "ExpensesController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExpenseDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The stored expense.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The category is not one the caller can use.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The month is closed. The response carries the month in `details`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Log an expense",
+        "tags": [
+          "Expenses"
+        ]
+      }
+    },
+    "/api/v1/expenses/{expenseId}": {
+      "patch": {
+        "description": "Changes an expense's category, month, amount, or note. Omitted fields are left alone.\n\nThe month is changeable here, unlike on a plan. Spend genuinely lands in the wrong month, usually because an invoice was dated differently from when the cost was incurred, and correcting that is an edit rather than a different record.\n\nThat is why a month change is checked at both ends. Moving an expense out of a closed month changes that month's total, so it is an edit to a closed period just as much as moving one in. A request that touches a closed month at either end is rejected with `423` naming the month that blocked it.",
+        "operationId": "ExpensesController_update_v1",
+        "parameters": [
+          {
+            "name": "expenseId",
+            "required": true,
+            "in": "path",
+            "description": "Identifier from the expense list.",
+            "schema": {
+              "example": "65f1c2d3e4b5a6c7d8e9f0c1",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ObjectId"
+                }
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateExpenseDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated expense.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The caller has no expense with that id, or the new category is not one they can use.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The month is closed. The response carries the month in `details`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Correct an expense",
+        "tags": [
+          "Expenses"
+        ]
+      },
+      "delete": {
+        "description": "Removes an expense, so it no longer counts toward the actual figure for its category and month.\n\nThe delete is soft. The audit trail keeps what the expense was, so a report run before the deletion can still be explained.\n\nRejected with `423` when the expense's month is closed.",
+        "operationId": "ExpensesController_remove_v1",
+        "parameters": [
+          {
+            "name": "expenseId",
+            "required": true,
+            "in": "path",
+            "description": "Identifier from the expense list.",
+            "schema": {
+              "example": "65f1c2d3e4b5a6c7d8e9f0c1",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/ObjectId"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The expense was removed."
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The caller has no expense with that id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "The month is closed. The response carries the month in `details`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove an expense",
+        "tags": [
+          "Expenses"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "description": "Answers whether the process is running. Checks no dependency.",
@@ -1688,7 +2006,7 @@
   },
   "info": {
     "title": "Plan vs Actual API",
-    "description": "Monthly spending targets, logged actuals, and variance reporting with locked periods.\n\n**Money** is an integer count of minor units. A field ending in `Minor` holds cents.\n\n**Months** are the string `YYYY-MM`.\n\n**Variance** is `actual - plan`. Variance percent is `null` when the plan is zero, never `NaN`.\n\n**Missing actuals** default to `0`. Pass `missingActuals=null` to receive `null` instead. Every report row carries `hasActual`, so a logged zero is never confused with nothing logged.\n\n**Locked periods** reject writes with `423` and the code `PERIOD_LOCKED`.\n\n**Deletes are soft.** A `DELETE` answers `204` and the record stops appearing in reads.\n\n**Sessions** travel in the `Authorization` header, never a cookie, so a mobile or desktop client is a first class caller. Access tokens are RS256 signed and short lived; refresh tokens are opaque, single use, and rotate.",
+    "description": "Monthly spending targets, logged expenses, and variance reporting with locked periods.\n\n**Money** is an integer count of minor units. A field ending in `Minor` holds cents.\n\n**Months** are the string `YYYY-MM`.\n\n**Variance** is `actual - plan`. Variance percent is `null` when the plan is zero, never `NaN`.\n\n**Missing actuals** default to `0`. Pass `missingActuals=null` to receive `null` instead. Every report row carries `hasActual`, so a logged zero is never confused with nothing logged.\n\n**Locked periods** reject writes with `423` and the code `PERIOD_LOCKED`.\n\n**Deletes are soft.** A `DELETE` answers `204` and the record stops appearing in reads.\n\n**Sessions** travel in the `Authorization` header, never a cookie, so a mobile or desktop client is a first class caller. Access tokens are RS256 signed and short lived; refresh tokens are opaque, single use, and rotate.",
     "version": "1.0.0",
     "contact": {}
   },
@@ -1990,9 +2308,9 @@
               "PLAN_CREATED",
               "PLAN_UPDATED",
               "PLAN_DELETED",
-              "ACTUAL_CREATED",
-              "ACTUAL_UPDATED",
-              "ACTUAL_DELETED",
+              "EXPENSE_CREATED",
+              "EXPENSE_UPDATED",
+              "EXPENSE_DELETED",
               "PERIOD_LOCKED",
               "PERIOD_UNLOCKED",
               "IMPORT_COMPLETED"
@@ -2005,7 +2323,7 @@
             "enum": [
               "CATEGORY",
               "PLAN",
-              "ACTUAL",
+              "EXPENSE",
               "PERIOD_LOCK",
               "IMPORT_BATCH"
             ],
@@ -2058,7 +2376,7 @@
         "properties": {
           "id": {
             "type": "string",
-            "description": "Identifier, used when creating a plan or an actual.",
+            "description": "Identifier, used when creating a plan or an expense.",
             "example": "65f1c2d3e4b5a6c7d8e9f0a1"
           },
           "name": {
@@ -2111,7 +2429,7 @@
           },
           "archived": {
             "type": "boolean",
-            "description": "Hide the category from pickers without removing it. Existing plans and actuals keep resolving it, and reports are unaffected.",
+            "description": "Hide the category from pickers without removing it. Existing plans and expenses keep resolving it, and reports are unaffected.",
             "example": true
           }
         }
@@ -2229,6 +2547,123 @@
         "required": [
           "targetMinor"
         ]
+      },
+      "ExpenseResponseDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identifier of the expense.",
+            "example": "65f1c2d3e4b5a6c7d8e9f0c1"
+          },
+          "categoryId": {
+            "type": "string",
+            "description": "The category it belongs to.",
+            "example": "65f1c2d3e4b5a6c7d8e9f0a1"
+          },
+          "month": {
+            "type": "string",
+            "description": "The month it belongs to.",
+            "example": "2026-01"
+          },
+          "amountMinor": {
+            "type": "number",
+            "description": "The amount in minor units. Negative means money came back.",
+            "example": 480000
+          },
+          "note": {
+            "type": "object",
+            "description": "Free text.",
+            "example": "Annual renewal",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "description": "How it got here.",
+            "enum": [
+              "MANUAL",
+              "CSV"
+            ],
+            "example": "MANUAL"
+          },
+          "importBatchId": {
+            "type": "object",
+            "description": "The import that wrote it, when it came from a file.",
+            "example": "65f1c2d3e4b5a6c7d8e9f0d1",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was logged.",
+            "example": "2026-01-15T10:04:11.212Z",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "categoryId",
+          "month",
+          "amountMinor",
+          "source",
+          "createdAt"
+        ]
+      },
+      "CreateExpenseDTO": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "The category the expense belongs to.",
+            "example": "65f1c2d3e4b5a6c7d8e9f0a1"
+          },
+          "month": {
+            "type": "string",
+            "description": "The month the expense belongs to. An expense belongs to a month, not to a date, so nothing here is a timestamp.",
+            "example": "2026-01"
+          },
+          "amountMinor": {
+            "type": "number",
+            "description": "The amount in minor units. 4,800.00 is 480000. Negative is allowed and means money came back, such as a refund or a credit note.",
+            "example": 480000
+          },
+          "note": {
+            "type": "string",
+            "description": "Optional free text.",
+            "example": "Annual renewal",
+            "maxLength": 280
+          }
+        },
+        "required": [
+          "categoryId",
+          "month",
+          "amountMinor"
+        ]
+      },
+      "UpdateExpenseDTO": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "Move the expense to a different category.",
+            "example": "65f1c2d3e4b5a6c7d8e9f0a1"
+          },
+          "month": {
+            "type": "string",
+            "description": "Move the expense to a different month. Both the old and the new month must be open.",
+            "example": "2026-02"
+          },
+          "amountMinor": {
+            "type": "number",
+            "description": "Correct the amount, in minor units.",
+            "example": 490000
+          },
+          "note": {
+            "type": "string",
+            "description": "Replace the note.",
+            "example": "Corrected after credit note",
+            "maxLength": 280
+          }
+        }
       }
     }
   }

@@ -10,7 +10,7 @@ import { AuditEntry, AuditEntrySchema } from './schemas/audit-entry.schema';
  *
  * @remarks
  * Exports {@link AuditLogService}, because every module that changes a plan, an
- * actual, a category, or a lock records that change here.
+ * expense, a category, or a lock records that change here.
  */
 @Module({
   imports: [MongooseModule.forFeature([{ name: AuditEntry.name, schema: AuditEntrySchema }])],

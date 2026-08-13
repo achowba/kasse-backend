@@ -34,7 +34,7 @@ variance % = (actual - plan) / plan * 100
 
 ## How it relates to the rest of the project
 
-The database sums plans and actuals; this module turns those sums into report cells. Plans, actuals, and the CSV import all store amounts through these helpers.
+The database sums plans and expenses; this module turns those sums into report cells. Plans, expenses, and the CSV import all store amounts through these helpers.
 
 ## Endpoints
 

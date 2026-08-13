@@ -12,9 +12,9 @@
  * @property PLAN_CREATED - A monthly target was set for the first time.
  * @property PLAN_UPDATED - An existing target was changed.
  * @property PLAN_DELETED - A target was soft deleted.
- * @property ACTUAL_CREATED - Spend was logged.
- * @property ACTUAL_UPDATED - Logged spend was changed.
- * @property ACTUAL_DELETED - Logged spend was soft deleted.
+ * @property EXPENSE_CREATED - An expense was logged.
+ * @property EXPENSE_UPDATED - An expense was corrected.
+ * @property EXPENSE_DELETED - An expense was soft deleted.
  * @property PERIOD_LOCKED - A month was locked.
  * @property PERIOD_UNLOCKED - A month was unlocked.
  * @property IMPORT_COMPLETED - A CSV import committed.
@@ -26,9 +26,9 @@ export enum AuditActionEnum {
   PLAN_CREATED = 'PLAN_CREATED',
   PLAN_UPDATED = 'PLAN_UPDATED',
   PLAN_DELETED = 'PLAN_DELETED',
-  ACTUAL_CREATED = 'ACTUAL_CREATED',
-  ACTUAL_UPDATED = 'ACTUAL_UPDATED',
-  ACTUAL_DELETED = 'ACTUAL_DELETED',
+  EXPENSE_CREATED = 'EXPENSE_CREATED',
+  EXPENSE_UPDATED = 'EXPENSE_UPDATED',
+  EXPENSE_DELETED = 'EXPENSE_DELETED',
   PERIOD_LOCKED = 'PERIOD_LOCKED',
   PERIOD_UNLOCKED = 'PERIOD_UNLOCKED',
   IMPORT_COMPLETED = 'IMPORT_COMPLETED',
@@ -39,14 +39,14 @@ export enum AuditActionEnum {
  *
  * @property CATEGORY - A spending category.
  * @property PLAN - A monthly target.
- * @property ACTUAL - Logged spend.
+ * @property EXPENSE - A logged expense.
  * @property PERIOD_LOCK - A locked month.
  * @property IMPORT_BATCH - A CSV import.
  */
 export enum AuditEntityEnum {
   CATEGORY = 'CATEGORY',
   PLAN = 'PLAN',
-  ACTUAL = 'ACTUAL',
+  EXPENSE = 'EXPENSE',
   PERIOD_LOCK = 'PERIOD_LOCK',
   IMPORT_BATCH = 'IMPORT_BATCH',
 }

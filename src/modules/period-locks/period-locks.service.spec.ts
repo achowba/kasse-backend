@@ -20,7 +20,7 @@ describe('PeriodLocksService', () => {
       listInRange: jest.fn().mockResolvedValue([]),
     };
 
-    auditLog = { record: jest.fn().mockResolvedValue(undefined) };
+    auditLog = { record: jest.fn() };
 
     service = new PeriodLocksService(repository as unknown as PeriodLocksRepository, auditLog as unknown as AuditLogService);
   });

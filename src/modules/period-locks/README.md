@@ -17,7 +17,7 @@ The API rejects a locked write with `423` and the code `PERIOD_LOCKED`, with the
 
 | Method | Used by |
 |---|---|
-| `assertUnlocked` | Creating or changing a single plan or actual. |
+| `assertUnlocked` | Creating or changing a single plan or expense. |
 | `assertMoveAllowed` | Changing a record's month. Checks the source and the destination. |
 | `assertAllUnlocked` | A CSV import. One query for every month in the file. |
 
@@ -41,7 +41,7 @@ Locking is an upsert, so closing an already closed month is harmless and preserv
 
 ## How it relates to the rest of the project
 
-Exports `PeriodLocksService`, which plans, actuals, and the CSV import all call before writing. Changes are recorded through `@modules/audit-log`.
+Exports `PeriodLocksService`, which plans, expenses, and the CSV import all call before writing. Changes are recorded through `@modules/audit-log`.
 
 ## Endpoints
 

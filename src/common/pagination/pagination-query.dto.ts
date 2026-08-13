@@ -7,7 +7,7 @@ import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from '@common/constants';
  *
  * @remarks
  * Offset paging rather than cursor paging. The collections here are a user's own
- * categories, plans, and actuals, which are small and are read with a sort the
+ * categories, plans, and expenses, which are small and are read with a sort the
  * user chose, so the cost of a large offset never arises. A cursor would buy
  * stability under concurrent writes that this data does not experience.
  *

@@ -12,7 +12,7 @@ import { PeriodLockDocument } from './schemas/period-lock.schema';
  *
  * @remarks
  * {@link PeriodLocksService.assertUnlocked} is the single place a locked period
- * is enforced. Every path that writes a plan or an actual calls it, including
+ * is enforced. Every path that writes a plan or an expense calls it, including
  * each row of a CSV import. It lives in a service rather than a guard or an
  * interceptor because the month being written is in the body or in the record
  * being changed, not in the route, and because a rule enforced only at the HTTP
@@ -27,6 +27,10 @@ export class PeriodLocksService {
 
   /**
    * Rejects the write when the month is closed.
+   *
+   * @steps
+   * 1. Read the lock for this account and month.
+   * 2. Throw when one exists.
    *
    * @param userId - The account whose period is in question.
    * @param month - The month being written to.
@@ -51,6 +55,11 @@ export class PeriodLocksService {
    * The source month is reported first when both are locked, because that is the
    * one the user did not expect to be blocked by.
    *
+   * @steps
+   * 1. Check the month the record is leaving.
+   * 2. Check the month it is joining, unless the move does not change the month,
+   *    in which case the second check would repeat the first.
+   *
    * @param userId - The account whose periods are in question.
    * @param fromMonth - The month the record is leaving.
    * @param toMonth - The month the record is moving to.
@@ -71,6 +80,12 @@ export class PeriodLocksService {
    * @remarks
    * One query for the whole batch. A CSV import spanning a year would otherwise
    * issue a round trip per month before writing anything.
+   *
+   * @steps
+   * 1. Reduce the months to the distinct set, since a file repeats months freely.
+   * 2. Ask for the locked ones among them in a single query.
+   * 3. Throw naming the earliest, so a file spanning several closed months always
+   *    reports the same one.
    *
    * @param userId - The account whose periods are in question.
    * @param months - Every month the batch writes to.
@@ -94,6 +109,12 @@ export class PeriodLocksService {
    * time alone, so locking a quarter that overlaps a month locked earlier does
    * not rewrite history.
    *
+   * @steps
+   * 1. Resolve the request into a list of months, expanding a quarter into three.
+   * 2. Lock each in turn, collecting only the ones that were not already locked.
+   * 3. Audit each newly closed month, so reopening one later has something to be
+   *    compared against.
+   *
    * @param userId - The account whose periods to close.
    * @param input - The months or the quarter to close.
    * @param requestId - The request making the change.
@@ -108,7 +129,7 @@ export class PeriodLocksService {
       if (await this.periodLocksRepository.lock(userId, month)) {
         newlyLocked.push(month);
 
-        await this.auditLogService.record({
+        this.auditLogService.record({
           userId,
           action: AuditActionEnum.PERIOD_LOCKED,
           entity: AuditEntityEnum.PERIOD_LOCK,
@@ -124,6 +145,14 @@ export class PeriodLocksService {
   /**
    * Reopens a period.
    *
+   * @steps
+   * 1. Validate the month, since it arrives from the path rather than a body and
+   *    has had no DTO applied to it.
+   * 2. Remove the lock, reporting not found when there was none.
+   * 3. Audit the reopening. This is the one removal in the project that is not a
+   *    soft delete: an absent row is precisely what "open" means, and a lock
+   *    carrying a `deletedAt` would make every lock check read a second field.
+   *
    * @param userId - The account whose period to reopen.
    * @param month - The month to reopen.
    * @param requestId - The request making the change.
@@ -138,7 +167,7 @@ export class PeriodLocksService {
       throw new NotFoundException(`${month} is not locked.`);
     }
 
-    await this.auditLogService.record({
+    this.auditLogService.record({
       userId,
       action: AuditActionEnum.PERIOD_UNLOCKED,
       entity: AuditEntityEnum.PERIOD_LOCK,
@@ -161,6 +190,15 @@ export class PeriodLocksService {
 
   /**
    * Turns the request into the list of months to close.
+   *
+   * @steps
+   * 1. Expand a quarter into its three months and stop, so a request carrying
+   *    both a quarter and a list has one defined meaning rather than two.
+   * 2. Reject an empty request, which would otherwise close nothing and report
+   *    success.
+   * 3. Reject malformed months as a group, naming all of them, so a caller fixing
+   *    a list is not made to resubmit once per bad entry.
+   * 4. Deduplicate and sort, so the audit trail reads in calendar order.
    *
    * @param input - The months or the quarter supplied.
    * @returns The months, deduplicated and in order.

@@ -87,7 +87,7 @@ describe('CategoriesService', () => {
       countShared: jest.fn().mockResolvedValue(CATEGORY_CATALOGUE.length),
     };
 
-    auditLog = { record: jest.fn().mockResolvedValue(undefined) };
+    auditLog = { record: jest.fn() };
 
     service = new CategoriesService(repository as unknown as CategoriesRepository, auditLog as unknown as AuditLogService);
   });

@@ -28,7 +28,7 @@ Backend API for tracking monthly spending targets against actual spend, with var
 
 ## What this is
 
-A user sets a monthly spending target per category, logs what was actually spent, and reads a report comparing the two with variance in both absolute and percentage terms. Periods can be locked, after which plans and actuals inside them are read only and the API rejects edits.
+A user sets a monthly spending target per category, logs what was actually spent, and reads a report comparing the two with variance in both absolute and percentage terms. Periods can be locked, after which plans and expenses inside them are read only and the API rejects edits.
 
 The API is client agnostic. It speaks JSON over REST, carries sessions in the `Authorization` header rather than cookies, and makes no assumption about whether the caller is a web app, a mobile app, or a script. The web client lives in a separate repository and consumes `openapi.json` from this one.
 
@@ -118,7 +118,7 @@ Two things are exempt, both ephemeral and neither owned by a user: refresh token
 
 A month is the unit of locking. Locking a quarter creates three month locks, so both granularities work against one data shape and one query.
 
-While a month is locked, its plans and actuals cannot be created, edited, or deleted. The API rejects the attempt with HTTP `423` and the code `PERIOD_LOCKED`; it does not rely on the client hiding a button. Moving an actual from one month to another checks both months, because moving spend out of a locked period is as much an edit as moving it in.
+While a month is locked, its plans and expenses cannot be created, edited, or deleted. The API rejects the attempt with HTTP `423` and the code `PERIOD_LOCKED`; it does not rely on the client hiding a button. Moving an expense from one month to another checks both months, because moving spend out of a locked period is as much an edit as moving it in.
 
 Locking is reversible. Unlocking is recorded in the audit log along with every other change to financial data.
 
@@ -183,7 +183,7 @@ Two seeders will be available:
 | Command | What it inserts |
 |---|---|
 | `npm run seed:spec` | The exact sample data from the assignment, used by the end to end test that asserts the report's numbers. |
-| `npm run seed:demo` | A catalogue of 40 categories and a demo user with 100 actuals across 12 months, mixing over plan, under plan, on plan, missing actuals, unplanned spend, and a locked quarter. |
+| `npm run seed:demo` | A catalogue of 40 categories and a demo user with 100 expenses across 12 months, mixing over plan, under plan, on plan, missing actuals, unplanned spend, and a locked quarter. |
 
 Both are deterministic. Neither uses unseeded randomness, so test expectations stay stable.
 
@@ -230,7 +230,7 @@ Each module folder carries its own README describing its purpose, its endpoints,
 | `modules/users` | User records, currency, and fiscal year start. |
 | `modules/categories` | The system catalogue and user owned categories. |
 | `modules/plans` | Monthly targets per category. |
-| `modules/actuals` | Logged spend, and the filtered list that serves report drill down. |
+| `modules/expenses` | Logged spend, and the filtered list that serves report drill down. |
 | `modules/period-locks` | Locking, unlocking, and the single enforcement gate. |
 | `modules/reports` | The aggregation, chart series, and CSV export. |
 | `modules/imports` | CSV upload, validation, and idempotent transactional writes. |
@@ -293,7 +293,7 @@ A deployed environment takes its secrets from the platform's secret store, never
 | Assumption | Reasoning |
 |---|---|
 | One currency per user | The assignment's data has no currency column. Per record currency would need an exchange rate policy to make totals meaningful, which is a larger product decision than this exercise implies. |
-| Negative actuals are allowed | Credit notes and refunds are real. Plan targets must be zero or positive. |
+| Negative expenses are allowed | Credit notes and refunds are real. Plan targets must be zero or positive. |
 | No data is ever hard deleted | Deletes set `deletedAt` and reads exclude those rows. A category also has a separate `archivedAt`, because hiding it from a picker while keeping it selectable in history is a different state from deleting it. |
 | System categories are shared, not copied | A catalogue row with no owner is readable by every user, so signup does not duplicate 40 rows per account. Users add their own categories on top and cannot edit the shared ones. |
 | No queue or Redis | Nothing in this workload is long running. A CSV of a few thousand rows validates and writes well inside a request. Adding a broker would add a deployed service and a polling contract for no measured gain. The threshold that would change this is recorded below. |
