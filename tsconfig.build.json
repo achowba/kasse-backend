@@ -1,4 +1,18 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Required by `tsc-alias`, which reads it to work out where the emitted
+    // tree begins. With `baseUrl` gone it has nothing else to infer from and
+    // stops with "rootDir is required with implicit baseUrl".
+    //
+    // It also pins the output layout. Left unset, the compiler infers the root
+    // from the common ancestor of the input files, so adding one file outside
+    // `src` would quietly move the entry point to `dist/src/main.js` and break
+    // `node dist/main`.
+    //
+    // It lives here rather than in the base config because that one also
+    // includes `test/**/*`, which sits outside `src`.
+    "rootDir": "./src"
+  },
   "exclude": ["node_modules", "test", "dist", "coverage", "**/*spec.ts"]
 }
