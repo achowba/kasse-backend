@@ -10,12 +10,7 @@ import {
 } from '@nestjs/terminus';
 import { Public } from '@common/auth';
 import { ApiVersionEnum } from '@common/enums';
-
-/** Heap ceiling above which the process is considered unhealthy. */
-const HEAP_LIMIT_BYTES = 512 * 1024 * 1024;
-
-/** How long the database ping may take before readiness fails. */
-const DATABASE_PING_TIMEOUT_MS = 1_500;
+import { DATABASE_PING_TIMEOUT_MS, HEAP_LIMIT_BYTES } from './health.constants';
 
 /**
  * Liveness and readiness probes.

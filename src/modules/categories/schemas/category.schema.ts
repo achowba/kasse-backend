@@ -1,9 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, SchemaTypes, Types } from 'mongoose';
 import { AbstractDocument } from '@common/database';
-
-/** Longest category name accepted. */
-export const CATEGORY_NAME_MAX_LENGTH = 60;
+import { CATEGORY_NAME_MAX_LENGTH } from '../categories.constants';
 
 /**
  * A spending category.

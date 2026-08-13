@@ -1,11 +1,6 @@
 import { registerAs } from '@nestjs/config';
+import { DEFAULT_ACCESS_TTL_SECONDS, DEFAULT_REFRESH_TTL_DAYS } from './config.constants';
 import { IAuthConfig } from './config.interface';
-
-/** Access token lifetime in seconds when `JWT_ACCESS_TTL_SECONDS` is not set. Fifteen minutes. */
-const DEFAULT_ACCESS_TTL_SECONDS = 900;
-
-/** Refresh token lifetime in days when `JWT_REFRESH_TTL_DAYS` is not set. */
-const DEFAULT_REFRESH_TTL_DAYS = 7;
 
 /**
  * Decodes a base64 encoded PEM key.

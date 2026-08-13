@@ -1,14 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
-
-/** Shortest password accepted. Length is the single strongest factor. */
-const MINIMUM_PASSWORD_LENGTH = 12;
-
-/** Longest password accepted, bounding the work a single request can ask for. */
-const MAXIMUM_PASSWORD_LENGTH = 128;
-
-/** Longest email accepted. */
-const MAXIMUM_EMAIL_LENGTH = 254;
+import { MAXIMUM_EMAIL_LENGTH, MAXIMUM_PASSWORD_LENGTH, MINIMUM_PASSWORD_LENGTH } from '../auth.constants';
 
 /**
  * Email and password, used by both signup and login.

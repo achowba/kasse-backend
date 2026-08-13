@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { AppException } from './app.exception';
 import { ErrorCodeEnum } from './error-code.enum';
 import { IErrorResponse } from './error-response.interface';
+import { GENERIC_SERVER_MESSAGE, SERVER_ERROR_THRESHOLD, STATUS_TO_CODE } from './errors.constants';
 
 /**
  * Describes a failure, before it is wrapped in the response envelope.
@@ -18,34 +19,6 @@ interface IDescribedFailure {
   message: string;
   details?: Record<string, unknown>;
 }
-
-/**
- * Codes for framework raised {@link HttpException}s that carry no code of their own.
- */
-const STATUS_TO_CODE: Partial<Record<number, ErrorCodeEnum>> = {
-  [HttpStatus.BAD_REQUEST]: ErrorCodeEnum.VALIDATION_FAILED,
-  [HttpStatus.UNAUTHORIZED]: ErrorCodeEnum.UNAUTHENTICATED,
-  [HttpStatus.FORBIDDEN]: ErrorCodeEnum.FORBIDDEN,
-  [HttpStatus.NOT_FOUND]: ErrorCodeEnum.NOT_FOUND,
-  [HttpStatus.CONFLICT]: ErrorCodeEnum.CONFLICT,
-  [HttpStatus.UNPROCESSABLE_ENTITY]: ErrorCodeEnum.IMPORT_VALIDATION_FAILED,
-  [HttpStatus.LOCKED]: ErrorCodeEnum.PERIOD_LOCKED,
-  [HttpStatus.TOO_MANY_REQUESTS]: ErrorCodeEnum.RATE_LIMITED,
-};
-
-/** Returned for any 5xx, so no internal detail reaches a client. */
-const GENERIC_SERVER_MESSAGE = 'An unexpected error occurred.';
-
-/**
- * Lowest status treated as a failure the service owns.
- *
- * @remarks
- * A plain number rather than `HttpStatus.INTERNAL_SERVER_ERROR`, because
- * comparing a number against an enum member is an unsafe enum comparison: the
- * status here comes from `getStatus()`, which is typed as a number and is not
- * guaranteed to be an enum member.
- */
-const SERVER_ERROR_THRESHOLD = 500;
 
 /**
  * Turns every thrown value into the one error envelope this API returns.

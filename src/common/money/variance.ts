@@ -10,6 +10,8 @@
  * @property ZERO - Treat a missing actual as `0`, so the variance is the whole plan.
  * @property NULL - Report the actual, variance, and percent as `null`, so a client can render a dash.
  */
+import { PERCENT_DECIMAL_PLACES } from './money.constants';
+
 export enum MissingActualPolicyEnum {
   ZERO = 'zero',
   NULL = 'null',
@@ -31,9 +33,6 @@ export interface IVarianceResult {
   variancePercent: number | null;
   hasActual: boolean;
 }
-
-/** Percentages are reported to two decimal places. */
-const PERCENT_DECIMAL_PLACES = 2;
 
 /**
  * Rounds to two decimal places.

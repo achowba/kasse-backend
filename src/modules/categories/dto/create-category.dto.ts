@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, MaxLength, MinLength } from 'class-validator';
-import { CATEGORY_NAME_MAX_LENGTH } from '../schemas/category.schema';
+import { CATEGORY_NAME_MAX_LENGTH } from '../categories.constants';
 
 /**
  * A category to create.

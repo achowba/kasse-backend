@@ -1,12 +1,4 @@
-/** A month, as `YYYY-MM`. Rejects month 00 and anything above 12. */
-export const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
-
-/** A quarter, as `YYYY-Q1` through `YYYY-Q4`. */
-export const QUARTER_PATTERN = /^\d{4}-Q[1-4]$/;
-
-/** Months in a year, and in a quarter. */
-const MONTHS_IN_YEAR = 12;
-const MONTHS_IN_QUARTER = 3;
+import { MONTH_PATTERN, MONTHS_IN_QUARTER, MONTHS_IN_YEAR, QUARTER_PATTERN } from './month.constants';
 
 /**
  * A month split into its parts.

@@ -4,13 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Types } from 'mongoose';
 import { IAuthConfig } from '@common/config';
-import { REFRESH_TOKEN_BYTES } from './auth.constants';
-
-/** Milliseconds in a day, for turning the configured lifetime into an expiry date. */
-const MILLISECONDS_PER_DAY = 86_400_000;
-
-/** Seconds in a millisecond's reciprocal, for converting a JWT `exp` claim. */
-const MILLISECONDS_PER_SECOND = 1_000;
+import { MILLISECONDS_PER_DAY, MILLISECONDS_PER_SECOND, REFRESH_TOKEN_BYTES } from './auth.constants';
 
 /**
  * The claims carried by an access token.

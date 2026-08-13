@@ -1,16 +1,7 @@
 import { plainToInstance } from 'class-transformer';
 import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min, MinLength, validateSync } from 'class-validator';
 import { NodeEnvEnum } from '@common/enums';
-
-/** Shortest base64 encoded key the service will start with. Catches an empty or truncated value. */
-const MINIMUM_KEY_LENGTH = 100;
-
-/** Shortest access token lifetime that is workable. Below a minute, clock skew alone causes failures. */
-const MINIMUM_ACCESS_TTL_SECONDS = 60;
-
-/** Markers a decoded key must contain to be the kind of key it claims to be. */
-const PRIVATE_KEY_MARKER = 'PRIVATE KEY';
-const PUBLIC_KEY_MARKER = 'PUBLIC KEY';
+import { MINIMUM_ACCESS_TTL_SECONDS, MINIMUM_KEY_LENGTH, PRIVATE_KEY_MARKER, PUBLIC_KEY_MARKER } from './config.constants';
 
 /**
  * Shape of the environment this service accepts.

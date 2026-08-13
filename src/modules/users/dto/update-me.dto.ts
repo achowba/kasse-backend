@@ -1,10 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
 import { CurrencyEnum } from '@common/enums';
-
-/** Bounds on the month a fiscal year may start in. */
-const FIRST_MONTH = 1;
-const LAST_MONTH = 12;
+import { FIRST_MONTH, LAST_MONTH } from '../users.constants';
 
 /**
  * The account settings a user may change.

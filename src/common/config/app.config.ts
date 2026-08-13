@@ -1,19 +1,8 @@
 import { registerAs } from '@nestjs/config';
 import { API_DOC_VERSION } from '@common/constants';
 import { NodeEnvEnum } from '@common/enums';
+import { DEFAULT_LOG_LEVEL, DEFAULT_PORT, DEFAULT_THROTTLE_LIMIT, DEFAULT_THROTTLE_TTL_MS } from './config.constants';
 import { IAppConfig } from './config.interface';
-
-/** Port used when `PORT` is not set. */
-const DEFAULT_PORT = 3000;
-
-/** Log level used when `LOG_LEVEL` is not set. */
-const DEFAULT_LOG_LEVEL = 'info';
-
-/** Rate limit window in milliseconds when `THROTTLE_TTL_MS` is not set. */
-const DEFAULT_THROTTLE_TTL_MS = 60_000;
-
-/** Requests per window when `THROTTLE_LIMIT` is not set. */
-const DEFAULT_THROTTLE_LIMIT = 120;
 
 /**
  * Splits a comma separated origin list into an allowlist.

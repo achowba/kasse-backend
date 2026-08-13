@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, Logger, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
 import { Types } from 'mongoose';
+import { DUPLICATE_KEY_ERROR } from '@common/database';
 import { IPaginatedResponse, toPaginatedResponse } from '@common/pagination';
 import { AuditActionEnum, AuditEntityEnum, AuditLogService } from '@modules/audit-log';
 import { CategoriesRepository } from './categories.repository';
@@ -10,9 +11,6 @@ import { CreateCategoryDTO } from './dto/create-category.dto';
 import { ListCategoriesQueryDTO } from './dto/list-categories.query.dto';
 import { UpdateCategoryDTO } from './dto/update-category.dto';
 import { CategoryDocument } from './schemas/category.schema';
-
-/** MongoDB's error code for a unique index violation. */
-const DUPLICATE_KEY_ERROR = 11_000;
 
 /**
  * Categories a user can plan and log spend against.
