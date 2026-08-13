@@ -6,6 +6,7 @@ import { LoggerModule, Params } from 'nestjs-pino';
 import { appConfig, authConfig, databaseConfig, IAppConfig, validateEnvironment } from '@common/config';
 import { DatabaseModule } from '@common/database';
 import { buildLoggerOptions } from '@common/logging';
+import { AuditLogModule } from '@modules/audit-log';
 import { AuthModule } from '@modules/auth';
 import { HealthModule } from '@modules/health';
 import { UsersModule } from '@modules/users';
@@ -43,6 +44,7 @@ import { UsersModule } from '@modules/users';
     }),
     AuthModule,
     UsersModule,
+    AuditLogModule,
     HealthModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
