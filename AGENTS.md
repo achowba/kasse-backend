@@ -17,7 +17,7 @@ Non-negotiable. Each line links to the convention that holds the detail.
 7. **No secret in a log, a commit, or a response body.** [security](.agents/conventions/security.convention.md)
 8. **Every change to financial data is audited.** [data modeling](.agents/conventions/data-modeling.convention.md)
 9. **Every function and method carries TSDoc,** above the declaration and never inside it, and a module's README changes in the same commit as the module. [tsdoc](.agents/conventions/tsdoc.convention.md), [documentation](.agents/conventions/documentation.convention.md)
-10. **Every commit is `type(scope): description`** with a required scope. [commits](.agents/conventions/commits.convention.md)
+10. **Every commit is `type(scope): description`** with a required scope, and every change reaches `main` through a pull request whose title is a sentence rather than a commit subject. [commits](.agents/conventions/commits.convention.md), [labels](.agents/conventions/labels.convention.md)
 
 ## Conventions
 
@@ -26,7 +26,8 @@ Non-negotiable. Each line links to the convention that holds the detail.
 | [api-design](.agents/conventions/api-design.convention.md) | REST shape, DTO boundaries, pagination, status codes, versioning, idempotency. |
 | [artifacts](.agents/conventions/artifacts.convention.md) | Where plans, reviews, and notes are written, and how they are named. |
 | [code-standards](.agents/conventions/code-standards.convention.md) | Typing, naming, async, module boundaries, file size. |
-| [commits](.agents/conventions/commits.convention.md) | Conventional Commits, required scopes, branch names, PR size. |
+| [commits](.agents/conventions/commits.convention.md) | Conventional Commits, required scopes, branch names, and how a pull request differs from a commit. |
+| [labels](.agents/conventions/labels.convention.md) | The label taxonomy, its local cache, and how to apply and upsert one. |
 | [data-modeling](.agents/conventions/data-modeling.convention.md) | Schemas, indexes, money, months, tenancy, locking, auditing. |
 | [documentation](.agents/conventions/documentation.convention.md) | TSDoc on every function, and the module README contract. |
 | [error-handling](.agents/conventions/error-handling.convention.md) | The error envelope, error codes, what a client is told. |
