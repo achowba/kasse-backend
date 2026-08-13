@@ -62,6 +62,14 @@ A spreadsheet cell holds `Marketing`, not an ObjectId. Names resolve through `Ca
 
 An unresolvable name is a row error naming the line, not an exception, so a file naming three unknown categories reports all three at once.
 
+### A spreadsheet is where invisible characters come from
+
+Every cell goes through `sanitiseText` rather than being trimmed. A file exported as UTF-8 with a BOM carries one on its first value, and a name copied out of a web page routinely brings a no break space or a zero width space with it. `trim` removes none of those, because none of them is whitespace as far as it is concerned.
+
+That mattered twice. A category cell holding nothing but invisible characters passed the "a category is required" check and then failed further down as an unknown category, pointing the reader at the wrong problem. And a note kept characters nobody could see, which came back out again through the CSV export.
+
+A control character or a text direction override is refused rather than cleaned, as a row error naming its line and column, on the same reasoning as everywhere else: repairing one silently would hide the attempt. See [common/text](../../common/text/README.md).
+
 ## Limits, and what lies past them
 
 | Limit | Value | Why |

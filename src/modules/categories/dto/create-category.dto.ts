@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, MaxLength, MinLength } from 'class-validator';
+import { SanitisedText } from '@common/text';
 import { CATEGORY_NAME_MAX_LENGTH } from '../categories.constants';
 
 /**
@@ -15,6 +16,7 @@ export class CreateCategoryDTO {
     minLength: 1,
     maxLength: CATEGORY_NAME_MAX_LENGTH,
   })
+  @SanitisedText()
   @IsString()
   @MinLength(1)
   @MaxLength(CATEGORY_NAME_MAX_LENGTH)

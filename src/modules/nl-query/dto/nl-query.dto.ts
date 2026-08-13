@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, MaxLength, MinLength } from 'class-validator';
 import { MissingSpendPolicyEnum } from '@common/money';
+import { SanitisedText } from '@common/text';
 import { ReportResponseDTO } from '@modules/reports';
 import { MAX_QUESTION_LENGTH } from '../nl-query.constants';
 
@@ -15,6 +16,7 @@ export class NlQueryDTO {
     example: 'How did marketing do in Q1 2026?',
     maxLength: MAX_QUESTION_LENGTH,
   })
+  @SanitisedText()
   @IsString()
   @MinLength(1)
   @MaxLength(MAX_QUESTION_LENGTH)

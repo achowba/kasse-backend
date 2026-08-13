@@ -1,6 +1,7 @@
 import { parse } from 'csv-parse/sync';
 import { parseAmountToMinor } from '@common/money';
 import { isValidMonth } from '@common/month';
+import { FORBIDDEN_CHARACTERS_MESSAGE, hasForbiddenCharacters, sanitiseText } from '@common/text';
 import { MAX_ROWS, NOTE_COLUMN, REQUIRED_COLUMNS } from './imports.constants';
 import { IImportRowError } from './schemas/import-batch.schema';
 
@@ -50,11 +51,23 @@ const normaliseHeader = (header: string): string => header.trim().toLowerCase();
 /**
  * Reads a value from a row by column name, whatever case the header used.
  *
+ * @remarks
+ * Sanitised rather than merely trimmed, because a spreadsheet is where invisible
+ * characters come from. A cell exported as UTF-8 with a BOM carries one on the
+ * first value in the file, and a name copied out of a web page routinely brings
+ * a no break space or a zero width space with it. Trimming leaves every one of
+ * them in place, since none is whitespace as far as `trim` is concerned.
+ *
+ * That mattered twice. A category cell holding nothing but invisible characters
+ * passed the "a category is required" check and then failed later as an unknown
+ * category, pointing the reader at the wrong problem. And a note kept characters
+ * that no one could see, which came back out of the CSV export.
+ *
  * @param row - The parsed row, keyed by its normalised headers.
  * @param column - The column to read.
- * @returns The trimmed value, or an empty string when the column is absent.
+ * @returns The sanitised value, or an empty string when the column is absent.
  */
-const cell = (row: Record<string, string>, column: string): string => (row[column] ?? '').trim();
+const cell = (row: Record<string, string>, column: string): string => sanitiseText(row[column] ?? '');
 
 /**
  * Parses and validates an uploaded CSV without touching the database.
@@ -125,6 +138,26 @@ export const parseExpenseCsv = (file: Buffer): IParseResult => {
 
     if (categoryName === '') {
       errors.push({ line, column: 'category', message: 'A category is required.' });
+
+      return;
+    }
+
+    // Refused rather than cleaned, for the same reason a request body is: a
+    // control character or a text direction override in a spreadsheet cell is
+    // not a paste accident, and silently repairing one would hide it. Reported
+    // per row, like every other rejection here, so the reader is sent to the
+    // line that needs fixing.
+    const offendingColumn = [
+      { column: 'category', value: categoryName },
+      { column: NOTE_COLUMN, value: note },
+    ].find(({ value }) => hasForbiddenCharacters(value));
+
+    if (offendingColumn !== undefined) {
+      errors.push({
+        line,
+        column: offendingColumn.column,
+        message: `A ${offendingColumn.column} ${FORBIDDEN_CHARACTERS_MESSAGE}.`,
+      });
 
       return;
     }
