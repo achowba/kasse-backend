@@ -39,6 +39,15 @@ export class EnvironmentVariables {
   CORS_ORIGINS?: string;
 
   /*
+   * Optional on purpose. Without it the natural language endpoint answers 503
+   * with a clear code and the rest of the API is unaffected, which is what makes
+   * the feature safe to ship without provisioning a key everywhere.
+   */
+  @IsOptional()
+  @IsString()
+  ANTHROPIC_API_KEY?: string;
+
+  /*
    * Required. Base64 encoded PEM keys: the private key signs access tokens and
    * the public key verifies them. Encoded because a PEM has newlines and an
    * environment variable is one line.

@@ -511,7 +511,8 @@
                 "PLAN",
                 "EXPENSE",
                 "PERIOD_LOCK",
-                "IMPORT_BATCH"
+                "IMPORT_BATCH",
+                "REPORT"
               ]
             }
           },
@@ -534,7 +535,8 @@
                 "EXPENSE_DELETED",
                 "PERIOD_LOCKED",
                 "PERIOD_UNLOCKED",
-                "IMPORT_COMPLETED"
+                "IMPORT_COMPLETED",
+                "NL_QUERY_RUN"
               ]
             }
           },
@@ -2266,6 +2268,74 @@
         ]
       }
     },
+    "/api/v1/reports/nl-query": {
+      "post": {
+        "description": "Turns a question such as \"how did marketing do in Q1 2026\" into a report filter, runs it, and returns both.\n\n**The model never writes a query.** It is given exactly one tool whose schema is a report filter: a month range, some category names, and a policy. It cannot express a collection, a field, an operator, or a database, it never sees a connection string, and the names it may choose from are this account's own categories. Whatever it returns is then validated by the same DTO a hand written report request goes through, and executed by the same report service.\n\nThat means this endpoint cannot reach anything `GET /reports/plan-vs-actual` could not, whatever the model returns. A model that answers with nonsense produces a validation error, not a query.\n\n**The filter comes back with the data.** A user has to be able to see that \"last quarter\" was read as the months they meant, and an answer with no visible interpretation is one the reader has to trust blindly.\n\nReturns `503` when the deployment has no `ANTHROPIC_API_KEY`, and `502` when the model is unreachable or does not produce a usable filter. Every other endpoint works either way, so the report is always available directly.",
+        "operationId": "NlQueryController_ask_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NlQueryDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The filter and the report it produced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NlQueryResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The model was unreachable or did not return a usable filter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "This deployment has no API key configured, so the endpoint is switched off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ask about spending in plain language",
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "description": "Answers whether the process is running. Checks no dependency.",
@@ -2916,7 +2986,8 @@
               "EXPENSE_DELETED",
               "PERIOD_LOCKED",
               "PERIOD_UNLOCKED",
-              "IMPORT_COMPLETED"
+              "IMPORT_COMPLETED",
+              "NL_QUERY_RUN"
             ],
             "example": "PLAN_UPDATED"
           },
@@ -2928,7 +2999,8 @@
               "PLAN",
               "EXPENSE",
               "PERIOD_LOCK",
-              "IMPORT_BATCH"
+              "IMPORT_BATCH",
+              "REPORT"
             ],
             "example": "PLAN"
           },
@@ -3564,6 +3636,92 @@
           "expenseCount",
           "errors",
           "createdAt"
+        ]
+      },
+      "NlQueryDTO": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "description": "A question about spending, in plain language.",
+            "example": "How did marketing do in Q1 2026?",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "question"
+        ]
+      },
+      "NlQueryFilterDTO": {
+        "type": "object",
+        "properties": {
+          "interpretation": {
+            "type": "string",
+            "description": "One sentence restating the question as it was understood.",
+            "example": "Marketing spend against plan for January to March 2026."
+          },
+          "from": {
+            "type": "string",
+            "description": "First month the report covers.",
+            "example": "2026-01"
+          },
+          "to": {
+            "type": "string",
+            "description": "Last month the report covers.",
+            "example": "2026-03"
+          },
+          "categories": {
+            "description": "Categories it was narrowed to. Empty means every category.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missingActuals": {
+            "type": "string",
+            "description": "The policy applied to months with nothing logged.",
+            "enum": [
+              "zero",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "interpretation",
+          "from",
+          "to",
+          "categories"
+        ]
+      },
+      "NlQueryResponseDTO": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "description": "The question as asked.",
+            "example": "How did marketing do in Q1 2026?"
+          },
+          "filter": {
+            "description": "How the question was read.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NlQueryFilterDTO"
+              }
+            ]
+          },
+          "report": {
+            "description": "The report that filter produced.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReportResponseDTO"
+              }
+            ]
+          }
+        },
+        "required": [
+          "question",
+          "filter",
+          "report"
         ]
       }
     }
