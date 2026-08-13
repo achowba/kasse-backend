@@ -1,12 +1,14 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, Res, StreamableFile } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiOkResponse,
   ApiOperation,
+  ApiProduces,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { CurrentUser, type IAuthenticatedUser } from '@common/auth';
 import { ApiVersionEnum } from '@common/enums';
 import { ErrorResponseDTO } from '@common/errors';
@@ -74,5 +76,46 @@ It shares the aggregation with the table rather than reimplementing it, so a cha
   @ApiBadRequestResponse({ description: 'The range ends before it starts, or a month is malformed.', type: ErrorResponseDTO })
   async series(@CurrentUser() user: IAuthenticatedUser, @Query() query: SeriesQueryDTO): Promise<SeriesResponseDTO> {
     return await this.reportsService.series(user.userId, query);
+  }
+
+  /**
+   * Downloads the report as a CSV file.
+   *
+   * @param user - The authenticated caller.
+   * @param query - The range and filters.
+   * @param response - The HTTP response, so the file headers can be set.
+   */
+  @Get('plan-vs-actual/export')
+  @ApiProduces('text/csv')
+  @ApiOperation({
+    summary: 'Download the report as CSV',
+    description: `The same report as a file, with a labelled totals row appended.
+
+Amounts are written in major units the way a person writes them, \`4800.00\`, with no currency symbol and no thousands separator, so a spreadsheet reads the column as a number rather than as text.
+
+A variance percentage with no answer, which is what a plan of zero produces, is written as \`-\` rather than as \`NaN\` or left blank. A blank cell reads as missing data; a dash reads as deliberate.
+
+Built from the same call that serves the JSON report, so the file and the table on screen cannot disagree, and a download straight after viewing is served from the same cached result.`,
+  })
+  @ApiOkResponse({
+    description: 'The report as CSV.',
+    content: { 'text/csv': { schema: { type: 'string' } } },
+  })
+  @ApiBadRequestResponse({ description: 'The range ends before it starts, or a month is malformed.', type: ErrorResponseDTO })
+  async exportCsv(
+    @CurrentUser() user: IAuthenticatedUser,
+    @Query() query: ReportQueryDTO,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<StreamableFile> {
+    const { csv, filename } = await this.reportsService.exportCsv(user.userId, query);
+
+    response.set({
+      'Content-Type': 'text/csv; charset=utf-8',
+      // `attachment` rather than `inline`, so a browser saves the file instead of
+      // rendering it as text in a tab.
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    });
+
+    return new StreamableFile(Buffer.from(csv, 'utf8'));
   }
 }

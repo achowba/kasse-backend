@@ -63,6 +63,24 @@ Per process, deliberately. Each instance holds its own cache and its own counter
 
 `GET /reports/plan-vs-actual/series` collapses the same numbers onto one axis, unpaginated, for charts. It shares the pipeline up to the grouping rather than reimplementing it, so a chart and the table beside it cannot disagree. An e2e test asserts exactly that by summing the series and comparing it to the table's totals.
 
+## The CSV export
+
+`GET /reports/plan-vs-actual/export` renders the same report as a file, with a labelled totals row appended. It calls `planVsActual` rather than reading the database again, so the file and the table on screen cannot disagree, and a download straight after viewing is served from the same cached result.
+
+Three formatting decisions, each of which has a wrong answer that looks fine:
+
+| Written as | Not as | Because |
+|---|---|---|
+| `4800.00` | `$4,800.00` | A spreadsheet reads the first as a number and the second as text. Currency symbols and thousands separators are display concerns that belong to whatever renders the file. |
+| `-250.00` | `(250.00)` | Accounting brackets are a display convention that would make the column non-numeric. |
+| `-` | `NaN`, or blank | A plan of zero has no percentage. A cell holding `NaN` is worse than an empty one, and a blank reads as missing data where a dash reads as deliberate. |
+
+A category named `Travel, UK` is quoted so it stays one column, which `csv-stringify` handles rather than string concatenation.
+
+The export is unpaginated up to a cap, because a spreadsheet of the first fifty rows is not the report.
+
+It does not round-trip into the CSV import, and is not meant to. The import reads `category,month,amount`; this file carries computed columns, and importing a variance is not a thing that can be done.
+
 ## Indexes it relies on
 
 Both collections carry `{ userId, month, ... }`. Equality on the owner then a range on the month is the order a range scan wants, so the `$match` at the head of each side of the union is an index scan rather than a collection scan.

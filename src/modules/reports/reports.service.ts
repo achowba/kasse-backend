@@ -7,7 +7,8 @@ import { ReportQueryDTO } from './dto/report-query.dto';
 import { ReportResponseDTO, ReportRowDTO, ReportTotalsDTO } from './dto/report-response.dto';
 import { SeriesQueryDTO } from './dto/series-query.dto';
 import { SeriesResponseDTO } from './dto/series-response.dto';
-import { REPORT_CACHE_MAX_ENTRIES, REPORT_CACHE_TTL_MS } from './reports.constants';
+import { renderReportCsv } from './report-csv';
+import { MAX_EXPORT_ROWS, REPORT_CACHE_MAX_ENTRIES, REPORT_CACHE_TTL_MS } from './reports.constants';
 import { SeriesGroupByEnum } from './reports.enums';
 import { IReportCell, IReportTotals, ReportsRepository } from './reports.repository';
 
@@ -130,6 +131,32 @@ export class ReportsService {
     this.writeCache(cacheKey, response);
 
     return response;
+  }
+
+  /**
+   * Renders the report as CSV.
+   *
+   * @remarks
+   * Reuses {@link ReportsService.planVsActual} rather than reading the database
+   * again, so an export and the table on screen cannot disagree. It also means
+   * the export is served from the cache when the table was just read, which is
+   * the common order: a user looks at the report, then downloads it.
+   *
+   * Unpaginated up to a cap. A spreadsheet of the first fifty rows is not the
+   * report, so paging it would defeat the point.
+   *
+   * @param userId - The authenticated caller.
+   * @param query - The range and filters.
+   * @returns The CSV text and the filename to offer.
+   * @throws BadRequestException When `to` is before `from`.
+   */
+  async exportCsv(userId: Types.ObjectId, query: ReportQueryDTO): Promise<{ csv: string; filename: string }> {
+    const report = await this.planVsActual(userId, { ...query, limit: MAX_EXPORT_ROWS, offset: 0 });
+
+    return {
+      csv: renderReportCsv(report.items, report.totals),
+      filename: `plan-vs-actual-${query.from}-to-${query.to}.csv`,
+    };
   }
 
   /**
