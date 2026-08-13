@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { AuditActionEnum, AuditLogService } from '@modules/audit-log';
 import { CategoriesRepository } from './categories.repository';
@@ -64,7 +64,7 @@ describe('CategoriesService', () => {
       | 'findVisibleById'
       | 'findVisibleBySlug'
       | 'findOwnedById'
-      | 'ownsSlug'
+      | 'slugIsVisible'
       | 'create'
       | 'update'
       | 'softDelete'
@@ -80,7 +80,7 @@ describe('CategoriesService', () => {
       findVisibleById: jest.fn().mockResolvedValue(buildCategory()),
       findVisibleBySlug: jest.fn().mockResolvedValue(buildCategory()),
       findOwnedById: jest.fn().mockResolvedValue(buildCategory()),
-      ownsSlug: jest.fn().mockResolvedValue(false),
+      slugIsVisible: jest.fn().mockResolvedValue(false),
       create: jest.fn().mockResolvedValue(buildCategory()),
       update: jest.fn().mockResolvedValue(buildCategory()),
       softDelete: jest.fn().mockResolvedValue(true),
@@ -133,9 +133,24 @@ describe('CategoriesService', () => {
     });
 
     it('rejects a name the caller already uses, whatever its capitalisation', async () => {
-      repository.ownsSlug.mockResolvedValue(true);
+      repository.slugIsVisible.mockResolvedValue(true);
 
       await expect(service.create(userId, { name: 'cloud  HOSTING' })).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('rejects a name the shared catalogue already uses', async () => {
+      // The unique index cannot catch this: it is keyed on `{ userId, slug }`
+      // and the two rows differ in `userId`. Allowing it put two rows with the
+      // same label in the variance table, with the spend split between them.
+      repository.slugIsVisible.mockResolvedValue(true);
+
+      await expect(service.create(userId, { name: 'Advertising' })).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('checks the name against everything visible, not only what the caller owns', async () => {
+      await service.create(userId, { name: 'Cloud Hosting' });
+
+      expect(repository.slugIsVisible).toHaveBeenCalledWith(userId, 'cloud-hosting');
     });
 
     it('rejects a name with nothing to normalise', async () => {
@@ -152,26 +167,45 @@ describe('CategoriesService', () => {
   });
 
   describe('update', () => {
-    it('answers not found for a category the caller does not own', async () => {
-      // A shared catalogue entry is never owned, so this is also how an attempt
-      // to rename one is answered.
+    it('refuses a shared catalogue entry, and says so rather than denying it exists', async () => {
+      // Not owned, but visible. The caller is looking at it in their own list,
+      // so "not found" would contradict the response they just read.
       repository.findOwnedById.mockResolvedValue(null);
+      repository.findVisibleById.mockResolvedValue(buildCategory({ userId: null }));
+
+      await expect(service.update(userId, new Types.ObjectId(), { name: 'New' })).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('answers not found for an id belonging to another account', async () => {
+      // Neither owned nor visible. Confirming it exists would leak that another
+      // tenant holds it, so this is answered exactly like an id that never was.
+      repository.findOwnedById.mockResolvedValue(null);
+      repository.findVisibleById.mockResolvedValue(null);
 
       await expect(service.update(userId, new Types.ObjectId(), { name: 'New' })).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('rejects a rename that collides with another of the caller’s categories', async () => {
       repository.findOwnedById.mockResolvedValue(buildCategory({ slug: 'payroll' }));
-      repository.ownsSlug.mockResolvedValue(true);
+      repository.slugIsVisible.mockResolvedValue(true);
 
       await expect(service.update(userId, new Types.ObjectId(), { name: 'Cloud Hosting' })).rejects.toBeInstanceOf(
         ConflictException,
       );
     });
 
+    it('rejects a rename onto a shared catalogue name', async () => {
+      repository.findOwnedById.mockResolvedValue(buildCategory({ slug: 'payroll' }));
+      repository.slugIsVisible.mockResolvedValue(true);
+
+      await expect(service.update(userId, new Types.ObjectId(), { name: 'Advertising' })).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+    });
+
     it('allows a rename that only changes capitalisation, since the key is unchanged', async () => {
       repository.findOwnedById.mockResolvedValue(buildCategory({ slug: 'cloud-hosting' }));
-      repository.ownsSlug.mockResolvedValue(true);
+      repository.slugIsVisible.mockResolvedValue(true);
 
       await expect(service.update(userId, new Types.ObjectId(), { name: 'CLOUD HOSTING' })).resolves.toBeDefined();
     });
@@ -203,10 +237,22 @@ describe('CategoriesService', () => {
   });
 
   describe('remove', () => {
-    it('answers not found for a category the caller does not own', async () => {
+    it('refuses to delete a shared catalogue entry', async () => {
+      // The seeded catalogue belongs to everybody, so no single account may
+      // remove an entry from under the others.
       repository.findOwnedById.mockResolvedValue(null);
+      repository.findVisibleById.mockResolvedValue(buildCategory({ userId: null }));
+
+      await expect(service.remove(userId, new Types.ObjectId())).rejects.toBeInstanceOf(ForbiddenException);
+      expect(repository.softDelete).not.toHaveBeenCalled();
+    });
+
+    it('answers not found for an id belonging to another account', async () => {
+      repository.findOwnedById.mockResolvedValue(null);
+      repository.findVisibleById.mockResolvedValue(null);
 
       await expect(service.remove(userId, new Types.ObjectId())).rejects.toBeInstanceOf(NotFoundException);
+      expect(repository.softDelete).not.toHaveBeenCalled();
     });
 
     it('soft deletes and records the last known state', async () => {
