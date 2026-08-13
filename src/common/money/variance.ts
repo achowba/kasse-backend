@@ -1,17 +1,17 @@
+import { PERCENT_DECIMAL_PLACES } from './money.constants';
+
 /**
  * How the report treats a category and month with a plan but nothing logged.
  *
  * @remarks
- * The assignment allows either reading, and asks only that it be consistent and
- * documented. `ZERO` is the default because it matches the primary numbers in the
- * published sample data, where February marketing shows a variance of the full
- * plan rather than a dash.
+ * Both readings are defensible and the choice only has to be consistent and
+ * stated. `ZERO` is the default because it matches the primary sample numbers,
+ * where a month with a target and no spend shows a variance of the full target
+ * rather than a dash.
  *
  * @property ZERO - Treat a missing actual as `0`, so the variance is the whole plan.
  * @property NULL - Report the actual, variance, and percent as `null`, so a client can render a dash.
  */
-import { PERCENT_DECIMAL_PLACES } from './money.constants';
-
 export enum MissingActualPolicyEnum {
   ZERO = 'zero',
   NULL = 'null',

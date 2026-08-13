@@ -1,5 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
+import { DataVersionService } from '@common/cache';
 import { AuditActionEnum, AuditLogService } from '@modules/audit-log';
 import { CategoriesService } from '@modules/categories';
 import { PeriodLockedException, PeriodLocksService } from '@modules/period-locks';
@@ -26,6 +27,7 @@ describe('PlansService', () => {
   let periodLocks: jest.Mocked<Pick<PeriodLocksService, 'assertUnlocked'>>;
   let categories: jest.Mocked<Pick<CategoriesService, 'getVisibleById'>>;
   let auditLog: jest.Mocked<Pick<AuditLogService, 'record'>>;
+  let dataVersion: jest.Mocked<Pick<DataVersionService, 'bump'>>;
   let service: PlansService;
 
   beforeEach(() => {
@@ -41,12 +43,14 @@ describe('PlansService', () => {
     periodLocks = { assertUnlocked: jest.fn().mockResolvedValue(undefined) };
     categories = { getVisibleById: jest.fn().mockResolvedValue({ _id: categoryId }) };
     auditLog = { record: jest.fn() };
+    dataVersion = { bump: jest.fn() };
 
     service = new PlansService(
       repository as unknown as PlansRepository,
       periodLocks as unknown as PeriodLocksService,
       categories as unknown as CategoriesService,
       auditLog as unknown as AuditLogService,
+      dataVersion as unknown as DataVersionService,
     );
   });
 

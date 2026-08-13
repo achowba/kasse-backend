@@ -1,5 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
+import { DataVersionService } from '@common/cache';
 import { AuditActionEnum, AuditLogService } from '@modules/audit-log';
 import { PeriodLockedException } from './period-locked.exception';
 import { PeriodLocksRepository } from './period-locks.repository';
@@ -9,6 +10,7 @@ describe('PeriodLocksService', () => {
   const userId = new Types.ObjectId();
   let repository: jest.Mocked<Pick<PeriodLocksRepository, 'isLocked' | 'findLockedAmong' | 'lock' | 'unlock' | 'listInRange'>>;
   let auditLog: jest.Mocked<Pick<AuditLogService, 'record'>>;
+  let dataVersion: jest.Mocked<Pick<DataVersionService, 'bump'>>;
   let service: PeriodLocksService;
 
   beforeEach(() => {
@@ -21,8 +23,13 @@ describe('PeriodLocksService', () => {
     };
 
     auditLog = { record: jest.fn() };
+    dataVersion = { bump: jest.fn() };
 
-    service = new PeriodLocksService(repository as unknown as PeriodLocksRepository, auditLog as unknown as AuditLogService);
+    service = new PeriodLocksService(
+      repository as unknown as PeriodLocksRepository,
+      auditLog as unknown as AuditLogService,
+      dataVersion as unknown as DataVersionService,
+    );
   });
 
   describe('assertUnlocked', () => {

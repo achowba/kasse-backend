@@ -1663,6 +1663,225 @@
         ]
       }
     },
+    "/api/v1/reports/plan-vs-actual": {
+      "get": {
+        "description": "One row per category and month in the range, with the target, what was spent, and the difference.\n\n**Variance** is `actual - plan`, so a negative number means under plan. **Variance percent** is `(actual - plan) / plan * 100` to two decimal places.\n\n**When the plan is 0, `variancePercent` is `null`.** Never `NaN`, never `Infinity`, and never a fabricated 100%. Dividing by zero has no answer, and a client renders `N/A`. The absolute `varianceMinor` is still correct and still worth showing: it is the whole of the unplanned spend.\n\n**A category with spend but no plan still appears.** That row is unplanned spend, which is usually the most interesting line in the report, and a naive join from the plan side would silently drop it.\n\n**Missing actuals** follow `?missingActuals=`. Under `zero` (the default) a month with a target and nothing logged reports an actual of 0 and a variance of the whole target. Under `null` the actual, variance, and percent are all `null` so a client can render a dash. Either way `hasActual` says which happened, so a logged 0 is never confused with nothing logged.\n\n**Totals cover the whole range, not the page.** They are computed in the same database pass as the rows, so the summary cannot disagree with the table beneath it or shift when the reader turns a page.",
+        "operationId": "ReportsController_planVsActual_v1",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "How many records to return.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "description": "How many records to skip.",
+            "schema": {
+              "minimum": 0,
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "First month of the range, inclusive.",
+            "schema": {
+              "example": "2026-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Last month of the range, inclusive.",
+            "schema": {
+              "example": "2026-02",
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryIds",
+            "required": false,
+            "in": "query",
+            "description": "Restrict to these categories. Repeat the parameter, or send one comma separated value.",
+            "schema": {
+              "example": [
+                "65f1c2d3e4b5a6c7d8e9f0a1"
+              ],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "missingActuals",
+            "required": false,
+            "in": "query",
+            "description": "How to report a category and month with a target but nothing logged. `zero` treats it as 0 spent, so the variance is the whole target. `null` reports the actual, variance, and percent as null, so a client can render a dash.",
+            "schema": {
+              "default": "zero",
+              "type": "string",
+              "enum": [
+                "zero",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The report.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportResponseDTO"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The range ends before it starts, or a month is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Plan against actual, with variance",
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/v1/reports/plan-vs-actual/series": {
+      "get": {
+        "description": "Collapses the report onto one axis: `groupBy=month` gives a point per month summed across categories, `groupBy=category` gives a point per category summed across the range.\n\nUnpaginated, deliberately. A chart needs every point in the range, and one rebuilt from a page of table rows would draw a line that stops partway through the year.\n\nIt shares the aggregation with the table rather than reimplementing it, so a chart and the table beside it cannot disagree.",
+        "operationId": "ReportsController_series_v1",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "First month of the range, inclusive.",
+            "schema": {
+              "example": "2026-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Last month of the range, inclusive.",
+            "schema": {
+              "example": "2026-02",
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryIds",
+            "required": false,
+            "in": "query",
+            "description": "Restrict to these categories. Repeat the parameter, or send one comma separated value.",
+            "schema": {
+              "example": [
+                "65f1c2d3e4b5a6c7d8e9f0a1"
+              ],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "groupBy",
+            "required": false,
+            "in": "query",
+            "description": "Whether each point is a month or a category.",
+            "schema": {
+              "default": "month",
+              "type": "string",
+              "enum": [
+                "month",
+                "category"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The series.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeriesResponseDTO"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The range ends before it starts, or a month is malformed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing, expired, or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "The same numbers, shaped for a chart",
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "description": "Answers whether the process is running. Checks no dependency.",
@@ -2664,6 +2883,217 @@
             "maxLength": 280
           }
         }
+      },
+      "ReportRowDTO": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "The category.",
+            "example": "65f1c2d3e4b5a6c7d8e9f0a1"
+          },
+          "categoryName": {
+            "type": "string",
+            "description": "The category name.",
+            "example": "Marketing"
+          },
+          "month": {
+            "type": "string",
+            "description": "The month.",
+            "example": "2026-01"
+          },
+          "planMinor": {
+            "type": "number",
+            "description": "The target, in minor units.",
+            "example": 500000
+          },
+          "actualMinor": {
+            "type": "object",
+            "description": "Logged spend, in minor units. Null only when nothing was logged and the policy is `null`.",
+            "example": 480000,
+            "nullable": true
+          },
+          "varianceMinor": {
+            "type": "object",
+            "description": "Actual minus plan. Negative means under plan.",
+            "example": -20000,
+            "nullable": true
+          },
+          "variancePercent": {
+            "type": "object",
+            "description": "The variance as a percentage of the plan, to two decimal places. **Null when the plan is 0**, because dividing by zero has no answer. Never `NaN` and never `Infinity`.",
+            "example": -4,
+            "nullable": true
+          },
+          "hasPlan": {
+            "type": "boolean",
+            "description": "Whether a target exists. A target of 0 is not the same as no target.",
+            "example": true
+          },
+          "hasActual": {
+            "type": "boolean",
+            "description": "Whether anything was logged. Logged 0 is not the same as nothing logged.",
+            "example": true
+          }
+        },
+        "required": [
+          "categoryId",
+          "categoryName",
+          "month",
+          "planMinor",
+          "hasPlan",
+          "hasActual"
+        ]
+      },
+      "ReportTotalsDTO": {
+        "type": "object",
+        "properties": {
+          "planMinor": {
+            "type": "number",
+            "description": "Every target in range, in minor units.",
+            "example": 2500000
+          },
+          "actualMinor": {
+            "type": "number",
+            "description": "Every expense in range, in minor units.",
+            "example": 2530000
+          },
+          "varianceMinor": {
+            "type": "number",
+            "description": "Actual minus plan across the range.",
+            "example": 30000
+          },
+          "variancePercent": {
+            "type": "object",
+            "description": "The variance as a percentage of the total plan. Null when the total plan is 0.",
+            "example": 1.2,
+            "nullable": true
+          }
+        },
+        "required": [
+          "planMinor",
+          "actualMinor",
+          "varianceMinor"
+        ]
+      },
+      "PaginationDTO": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "number",
+            "description": "How many records were requested.",
+            "example": 50
+          },
+          "offset": {
+            "type": "number",
+            "description": "How many records were skipped.",
+            "example": 0
+          },
+          "total": {
+            "type": "number",
+            "description": "How many records match the filter, across every page.",
+            "example": 4
+          }
+        },
+        "required": [
+          "limit",
+          "offset",
+          "total"
+        ]
+      },
+      "ReportResponseDTO": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "The rows on this page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportRowDTO"
+            }
+          },
+          "totals": {
+            "description": "Totals across the whole range, not just this page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReportTotalsDTO"
+              }
+            ]
+          },
+          "pagination": {
+            "description": "Where this page sits in the whole result set.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaginationDTO"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "totals",
+          "pagination"
+        ]
+      },
+      "SeriesPointDTO": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The month, or the category id, this point is grouped under.",
+            "example": "2026-01"
+          },
+          "label": {
+            "type": "string",
+            "description": "What to render on the axis.",
+            "example": "2026-01"
+          },
+          "planMinor": {
+            "type": "number",
+            "description": "Planned, summed for this point.",
+            "example": 2500000
+          },
+          "actualMinor": {
+            "type": "number",
+            "description": "Logged, summed for this point.",
+            "example": 2530000
+          },
+          "varianceMinor": {
+            "type": "number",
+            "description": "Actual minus plan for this point.",
+            "example": 30000
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "planMinor",
+          "actualMinor",
+          "varianceMinor"
+        ]
+      },
+      "SeriesResponseDTO": {
+        "type": "object",
+        "properties": {
+          "groupBy": {
+            "type": "string",
+            "description": "Which axis the points are grouped on.",
+            "enum": [
+              "month",
+              "category"
+            ]
+          },
+          "points": {
+            "description": "The points, in axis order.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SeriesPointDTO"
+            }
+          }
+        },
+        "required": [
+          "groupBy",
+          "points"
+        ]
       }
     }
   }
