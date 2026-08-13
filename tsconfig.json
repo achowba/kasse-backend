@@ -13,10 +13,16 @@
     "target": "ES2023",
     "sourceMap": true,
     "outDir": "./dist",
-    "baseUrl": "./",
+    // No `baseUrl`. It has not been required alongside `paths` since TypeScript
+    // 4.1, and setting it resolves bare specifiers from the project root ahead
+    // of `node_modules`, so a top level directory sharing a package's name
+    // silently shadows the real dependency.
+    //
+    // Dropping it means the values below have to be relative. Without a leading
+    // `./` the compiler refuses them outright, with TS5090.
     "paths": {
-      "@common/*": ["src/common/*"],
-      "@modules/*": ["src/modules/*"]
+      "@common/*": ["./src/common/*"],
+      "@modules/*": ["./src/modules/*"]
     },
     "incremental": true,
     "skipLibCheck": true,
