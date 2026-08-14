@@ -311,6 +311,8 @@ Validated at boot, so a missing or malformed value stops the process rather than
 
 MongoDB must be a **replica set**, even locally, because the CSV import writes every row in one transaction. `docker compose up -d` starts a single node set and initiates it in the healthcheck.
 
+The service **refuses to start** against a standalone rather than failing later on the routes that need a transaction. The error names the cause and both remedies, which the driver's own message does not. See [common/database](src/common/database/README.md).
+
 | Command | What it writes |
 |---|---|
 | `npm run seed:spec` | Exactly the four rows of the assignment's sample table, and nothing else. |
