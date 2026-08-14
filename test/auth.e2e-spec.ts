@@ -372,6 +372,154 @@ describe('Auth (e2e)', () => {
     });
   });
 
+  describe('changing the login address', () => {
+    /**
+     * Changes the address on an account.
+     *
+     * @param accessToken - The caller's access token.
+     * @param currentPassword - The password proving identity.
+     * @param newEmail - The address to move to.
+     * @returns The supertest response.
+     */
+    const changeEmail = (accessToken: string, currentPassword: string, newEmail: string): request.Test =>
+      request(server())
+        .patch('/api/v1/auth/email')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ currentPassword, newEmail });
+
+    it('refuses without an access token', async () => {
+      await request(server())
+        .patch('/api/v1/auth/email')
+        .send({ currentPassword: PASSWORD, newEmail: emailFor('anon') })
+        .expect(401);
+    });
+
+    it('refuses a wrong current password even though the token is valid', async () => {
+      const { accessToken } = await signup('email-wrong-password');
+
+      const response = await changeEmail(accessToken, 'not the current password', emailFor('nope')).expect(401);
+
+      expect((response.body as { code: string }).code).toBe('UNAUTHENTICATED');
+    });
+
+    it('leaves the old address working when the change is refused', async () => {
+      const { user, accessToken } = await signup('email-refused');
+
+      await changeEmail(accessToken, 'not the current password', emailFor('nope')).expect(401);
+
+      await request(server()).post('/api/v1/auth/login').send({ email: user.email, password: PASSWORD }).expect(200);
+    });
+
+    it('rejects something that is not an address', async () => {
+      const { accessToken } = await signup('email-malformed');
+
+      const response = await changeEmail(accessToken, PASSWORD, 'not-an-address').expect(400);
+
+      // Refused at the edge by the DTO, before the password is even checked, so
+      // a typo cannot reach the database and rely on the index to catch it.
+      expect((response.body as { code: string }).code).toBe('VALIDATION_FAILED');
+    });
+
+    it('moves the account, so the new address logs in and the old one does not', async () => {
+      const { user, accessToken } = await signup('email-happy');
+      const next = emailFor('email-happy-new');
+
+      const response = await changeEmail(accessToken, PASSWORD, next).expect(200);
+      const body = response.body as IAuthBody;
+
+      expect(body.user.email).toBe(next);
+
+      await request(server()).post('/api/v1/auth/login').send({ email: next, password: PASSWORD }).expect(200);
+      await request(server()).post('/api/v1/auth/login').send({ email: user.email, password: PASSWORD }).expect(401);
+    });
+
+    it('returns a pair whose token carries the new address', async () => {
+      const { accessToken } = await signup('email-token');
+      const next = emailFor('email-token-new');
+
+      const response = await changeEmail(accessToken, PASSWORD, next).expect(200);
+      const fresh = (response.body as IAuthBody).accessToken;
+
+      // The access token carries the address for log attribution, so a pair
+      // issued by this route has to carry the new one or every line about this
+      // account names an address it no longer has.
+      const payload = JSON.parse(Buffer.from(fresh.split('.')[1] ?? '', 'base64url').toString('utf8')) as { email: string };
+
+      expect(payload.email).toBe(next);
+    });
+
+    it('refuses an address another account already holds', async () => {
+      const other = await signup('email-taken-by');
+      const { accessToken } = await signup('email-taker');
+
+      const response = await changeEmail(accessToken, PASSWORD, other.user.email).expect(409);
+
+      expect((response.body as { code: string }).code).toBe('CONFLICT');
+    });
+
+    it('leaves the other account untouched when the address is refused', async () => {
+      const other = await signup('email-victim');
+      const { accessToken } = await signup('email-thief');
+
+      await changeEmail(accessToken, PASSWORD, other.user.email).expect(409);
+
+      // The point of the conflict. One account cannot take another's identity,
+      // and the refusal must not have half moved anything.
+      await request(server()).post('/api/v1/auth/login').send({ email: other.user.email, password: PASSWORD }).expect(200);
+    });
+
+    it('treats the address it already has as a success that changes nothing', async () => {
+      const { user, accessToken } = await signup('email-same');
+
+      // Answering 409 against their own account would be a confusing way to say
+      // "no change needed".
+      const response = await changeEmail(accessToken, PASSWORD, user.email).expect(200);
+
+      expect((response.body as IAuthBody).user.email).toBe(user.email);
+    });
+
+    it('matches an address case insensitively rather than creating a second one', async () => {
+      const { user, accessToken } = await signup('email-case');
+
+      const response = await changeEmail(accessToken, PASSWORD, user.email.toUpperCase()).expect(200);
+
+      expect((response.body as IAuthBody).user.email).toBe(user.email);
+    });
+
+    it('keeps other sessions alive, because no credential changed', async () => {
+      const { user, accessToken } = await signup('email-sessions');
+
+      const other = await request(server())
+        .post('/api/v1/auth/login')
+        .send({ email: user.email, password: PASSWORD })
+        .expect(200);
+      const otherRefreshToken = (other.body as IAuthBody).refreshToken;
+
+      await changeEmail(accessToken, PASSWORD, emailFor('email-sessions-new')).expect(200);
+
+      // Deliberately unlike a password change. Nothing was compromised, so
+      // signing every device out would be disruption without a reason.
+      await request(server()).post('/api/v1/auth/refresh').send({ refreshToken: otherRefreshToken }).expect(200);
+    });
+
+    it('records both sides of the change without the password', async () => {
+      const { user, accessToken } = await signup('email-audited');
+      const next = emailFor('email-audited-new');
+
+      const changed = await changeEmail(accessToken, PASSWORD, next).expect(200);
+      const fresh = (changed.body as IAuthBody).accessToken;
+
+      const audit = await request(server()).get('/api/v1/audit-log?limit=10').set('Authorization', `Bearer ${fresh}`).expect(200);
+
+      const entries = (audit.body as { items: { action: string; before?: unknown; after?: unknown }[] }).items;
+      const entry = entries.find((item) => item.action === 'EMAIL_CHANGED');
+
+      expect(entry?.before).toEqual({ email: user.email });
+      expect(entry?.after).toEqual({ email: next });
+      expect(JSON.stringify(entries)).not.toContain(PASSWORD);
+    });
+  });
+
   describe('changing a password', () => {
     const NEW_PASSWORD = 'a replacement password';
 

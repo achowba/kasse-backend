@@ -1,18 +1,28 @@
 import { ConflictException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import { ClientSession, Connection, Types } from 'mongoose';
-import { withTransaction } from '@common/database';
+import { DUPLICATE_KEY_ERROR, withTransaction } from '@common/database';
 import { logUser } from '@common/logging';
 import { AuditActionEnum, AuditEntityEnum, AuditLogService } from '@modules/audit-log';
 import { UserDocument, UserResponseDTO, UsersService } from '@modules/users';
 import { INVALID_CREDENTIALS } from './auth.constants';
 import { AuthResponseDTO } from './dto/auth-response.dto';
+import { ChangeEmailDTO } from './dto/change-email.dto';
 import { ChangePasswordDTO } from './dto/change-password.dto';
 import { CredentialsDTO } from './dto/credentials.dto';
 import { SessionResponseDTO } from './dto/session-response.dto';
 import { PasswordService } from './password.service';
 import { RefreshTokensRepository } from './refresh-tokens.repository';
 import { TokenService } from './token.service';
+
+/**
+ * Reports whether an error is a unique index violation.
+ *
+ * @param error - The thrown value.
+ * @returns True when MongoDB rejected the write as a duplicate.
+ */
+const isDuplicateKey = (error: unknown): boolean =>
+  typeof error === 'object' && error !== null && 'code' in error && error.code === DUPLICATE_KEY_ERROR;
 
 /**
  * Signup, login, token rotation, and session management.
@@ -307,6 +317,93 @@ export class AuthService {
     });
 
     return await this.establishSession(user);
+  }
+
+  /**
+   * Moves the caller's account to a different login address.
+   *
+   * @remarks
+   * The current password is required, and for a sharper reason than on a
+   * password change. The address **is** the login identity: whoever holds it is
+   * who the account belongs to. Changing it with nothing but a borrowed access
+   * token would hand the account over, so it is the field that most needs proof
+   * beyond a token.
+   *
+   * Other sessions are **not** revoked, unlike a password change. Nothing about
+   * the credentials has changed, so signing every device out would be disruption
+   * without a security reason. The caller does get a fresh pair, because the
+   * access token carries the address and theirs is now stale.
+   *
+   * Every other live session keeps a token carrying the old address until it
+   * expires, which is minutes. That affects only what a log line says, never
+   * what a request may do, because authorisation is on the account id alone.
+   *
+   * Uniqueness is enforced by catching the index violation rather than by asking
+   * first. A check and then a write is two operations with a gap between them,
+   * and two requests can both pass the check before either writes.
+   *
+   * The new address is **not verified**. Confirming somebody can receive mail
+   * there needs a token sent to it, which needs an email transport this
+   * deployment has no provider for.
+   *
+   * @steps
+   * 1. Load the account and verify the current password.
+   * 2. Return unchanged when it already has the address asked for.
+   * 3. Write the new address, letting the unique index arbitrate.
+   * 4. Turn a duplicate key into a conflict.
+   * 5. Record both sides of the change.
+   * 6. Issue a fresh pair, so the caller's token carries the new address.
+   *
+   * @param userId - The authenticated caller.
+   * @param input - The current password and the new address.
+   * @param requestId - The request making the change.
+   * @returns A new token pair carrying the new address.
+   * @throws UnauthorizedException When the current password does not match.
+   * @throws ConflictException When the address belongs to another live account.
+   */
+  async changeEmail(userId: Types.ObjectId, input: ChangeEmailDTO, requestId?: string): Promise<AuthResponseDTO> {
+    const user = await this.usersService.getById(userId);
+
+    if (!(await this.passwordService.verify(user.passwordHash, input.currentPassword))) {
+      this.logger.log(logUser(userId.toString(), user.email), 'email change rejected: wrong current password');
+
+      throw new UnauthorizedException(INVALID_CREDENTIALS);
+    }
+
+    const previousEmail = user.email;
+    const nextEmail = input.newEmail.trim().toLowerCase();
+
+    if (nextEmail === previousEmail) {
+      // Asking for the address it already has is not an error, and answering 409
+      // against their own account would be a confusing way to say so.
+      return await this.establishSession(user);
+    }
+
+    let updated: UserDocument;
+
+    try {
+      updated = await this.usersService.updateEmail(userId, nextEmail);
+    } catch (error) {
+      if (isDuplicateKey(error)) {
+        throw new ConflictException('That email address is already registered.');
+      }
+
+      throw error;
+    }
+
+    this.logger.log(logUser(userId.toString(), updated.email), 'email changed');
+
+    this.auditLogService.record({
+      userId,
+      action: AuditActionEnum.EMAIL_CHANGED,
+      entity: AuditEntityEnum.USER,
+      entityId: userId,
+      before: { email: previousEmail },
+      after: { email: updated.email },
+      requestId,
+    });
+
+    return await this.establishSession(updated);
   }
 
   /**
