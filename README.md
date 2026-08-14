@@ -322,6 +322,17 @@ Neither writes to a collection directly. They go through the services, so seeded
 
 Indexes are declared on the schemas and created by Mongoose on boot. Details in [data-modeling](.agents/conventions/data-modeling.convention.md).
 
+### Sample CSVs
+
+[`examples/`](examples/) holds two files for trying the import without writing one:
+
+| File | Result |
+|---|---|
+| [`expenses.csv`](examples/expenses.csv) | `201`, 15 rows written across three months. |
+| [`expenses-with-errors.csv`](examples/expenses-with-errors.csv) | `422`, four errors naming their line and column, and **nothing written**. |
+
+Every category in the valid file comes from the shared catalogue seeded at boot, so a brand new account can import it with no other setup. The broken file is there because the per line error list and the all or nothing write are the two things worth seeing, and neither is visible from a file that works. See [examples/README.md](examples/README.md).
+
 ---
 
 ## API documentation
@@ -437,6 +448,7 @@ src/
   modules/         one folder per feature, each with schema, DTOs, service, controller, spec, README
   seed/            spec and demo seeders with their own root module
 test/              end to end specs, global setup, the committed contract check
+examples/          sample CSVs for the import, one valid and one deliberately broken
 .agents/           engineering conventions this repository is held to
 ```
 

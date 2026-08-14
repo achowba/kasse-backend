@@ -1,0 +1,7 @@
+category,month,amount,note
+Salaries,2026-01,42000.00,This row is fine
+Nonexistent Category,2026-01,1200.00,No such category for this account
+Advertising,2026-1,800.00,Month is not YYYY-MM
+Office Rent,2026-02,seven hundred,Amount is not a number
+,2026-02,500.00,Category is missing
+Employee Travel,2026-02,1830.75,This row is fine too
