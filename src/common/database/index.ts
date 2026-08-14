@@ -3,4 +3,5 @@ export * from './base.repository';
 export * from './database.constants';
 export * from './database.module';
 export * from './tenant-owned.document';
+export * from './topology.check';
 export * from './transaction.helper';

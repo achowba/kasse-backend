@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { MongooseModule, MongooseModuleFactoryOptions } from '@nestjs/mongoose';
 import { IDatabaseConfig } from '@common/config';
 import { MAX_POOL_SIZE, SERVER_SELECTION_TIMEOUT_MS } from './database.constants';
+import { TopologyCheck } from './topology.check';
 
 /**
  * Owns the database connection.
@@ -32,6 +33,11 @@ import { MAX_POOL_SIZE, SERVER_SELECTION_TIMEOUT_MS } from './database.constants
       },
     }),
   ],
+  // A provider rather than a call in `main.ts`, so it runs through
+  // `OnApplicationBootstrap` with the connection already injected and every
+  // other module initialised. Bootstrapping it by hand would mean resolving the
+  // connection manually and would let a future entry point forget it.
+  providers: [TopologyCheck],
   exports: [MongooseModule],
 })
 export class DatabaseModule {}
