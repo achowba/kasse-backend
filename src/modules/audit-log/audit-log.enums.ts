@@ -20,6 +20,7 @@
  * @property IMPORT_COMPLETED - A CSV import committed.
  * @property NL_QUERY_RUN - A question was turned into a report filter and run.
  * @property PASSWORD_CHANGED - An account changed its own password.
+ * @property EMAIL_CHANGED - An account moved to a different login address.
  */
 export enum AuditActionEnum {
   CATEGORY_CREATED = 'CATEGORY_CREATED',
@@ -36,6 +37,7 @@ export enum AuditActionEnum {
   IMPORT_COMPLETED = 'IMPORT_COMPLETED',
   NL_QUERY_RUN = 'NL_QUERY_RUN',
   PASSWORD_CHANGED = 'PASSWORD_CHANGED',
+  EMAIL_CHANGED = 'EMAIL_CHANGED',
 }
 
 /**

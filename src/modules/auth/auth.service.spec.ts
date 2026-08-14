@@ -10,10 +10,10 @@ import { RefreshTokenDocument } from './schemas/refresh-token.schema';
 import { TokenService } from './token.service';
 
 /** Stand in for a stored account, carrying every field the response mapper reads. */
-const buildUser = (id = new Types.ObjectId()): UserDocument =>
+const buildUser = (id = new Types.ObjectId(), email = 'finance@acme.test'): UserDocument =>
   ({
     _id: id,
-    email: 'finance@acme.test',
+    email,
     passwordHash: '$argon2id$stored',
     currency: CurrencyEnum.USD,
     fiscalYearStartMonth: 1,
@@ -36,7 +36,7 @@ const buildTokenRecord = (overrides: Partial<RefreshTokenDocument> = {}): Refres
 
 describe('AuthService', () => {
   let usersService: jest.Mocked<
-    Pick<UsersService, 'isEmailTaken' | 'create' | 'findByEmail' | 'findById' | 'getById' | 'updatePassword'>
+    Pick<UsersService, 'isEmailTaken' | 'create' | 'findByEmail' | 'findById' | 'getById' | 'updatePassword' | 'updateEmail'>
   >;
   let passwordService: jest.Mocked<Pick<PasswordService, 'hash' | 'verify'>>;
   let auditLog: jest.Mocked<Pick<AuditLogService, 'record'>>;
@@ -54,6 +54,7 @@ describe('AuthService', () => {
       findById: jest.fn().mockResolvedValue(buildUser()),
       getById: jest.fn().mockResolvedValue(buildUser()),
       updatePassword: jest.fn().mockResolvedValue(undefined),
+      updateEmail: jest.fn().mockResolvedValue(buildUser(undefined, 'moved@acme.test')),
     };
 
     auditLog = { record: jest.fn() };
@@ -259,6 +260,89 @@ describe('AuthService', () => {
 
     it('reports how many sessions ending everything revoked', async () => {
       await expect(service.revokeAllSessions(new Types.ObjectId())).resolves.toBe(3);
+    });
+  });
+
+  describe('changeEmail', () => {
+    const change = { currentPassword: 'the current password', newEmail: 'moved@acme.test' };
+
+    it('rejects a wrong current password, because the address is the login identity', async () => {
+      passwordService.verify.mockResolvedValue(false);
+
+      await expect(service.changeEmail(new Types.ObjectId(), change)).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('writes nothing when the current password is wrong', async () => {
+      passwordService.verify.mockResolvedValue(false);
+
+      await expect(service.changeEmail(new Types.ObjectId(), change)).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(usersService.updateEmail).not.toHaveBeenCalled();
+    });
+
+    it('lowercases and trims before writing, so one address cannot become two', async () => {
+      const userId = new Types.ObjectId();
+
+      usersService.getById.mockResolvedValue(buildUser(userId));
+
+      await service.changeEmail(userId, { ...change, newEmail: '  Moved@Acme.test  ' });
+
+      expect(usersService.updateEmail).toHaveBeenCalledWith(userId, 'moved@acme.test');
+    });
+
+    it('turns a duplicate key into a conflict rather than a server error', async () => {
+      // Uniqueness is decided by the index, not by asking first, because a check
+      // and then a write is two operations with a gap between them.
+      usersService.updateEmail.mockRejectedValue({ code: 11_000 });
+
+      await expect(service.changeEmail(new Types.ObjectId(), change)).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('does not swallow a failure that is not a duplicate', async () => {
+      usersService.updateEmail.mockRejectedValue(new Error('connection lost'));
+
+      await expect(service.changeEmail(new Types.ObjectId(), change)).rejects.toThrow('connection lost');
+    });
+
+    it('changes nothing when asked for the address it already has', async () => {
+      const user = buildUser();
+
+      usersService.getById.mockResolvedValue(user);
+
+      const result = await service.changeEmail(user._id, { ...change, newEmail: user.email });
+
+      // Answering 409 against their own account would be a confusing way to say
+      // "no change needed".
+      expect(usersService.updateEmail).not.toHaveBeenCalled();
+      expect(result.accessToken).toBeDefined();
+    });
+
+    it('keeps every other session, unlike a password change', async () => {
+      await service.changeEmail(new Types.ObjectId(), change);
+
+      // No credential changed, so ending every session would be disruption
+      // without a security reason.
+      expect(refreshTokens.revokeAll).not.toHaveBeenCalled();
+    });
+
+    it('records both sides of the change, without the password', async () => {
+      const user = buildUser();
+
+      usersService.getById.mockResolvedValue(user);
+      usersService.updateEmail.mockResolvedValue(buildUser(user._id, 'moved@acme.test'));
+
+      await service.changeEmail(user._id, change, 'req-4');
+
+      const entry = auditLog.record.mock.calls[0]?.[0];
+
+      expect(entry).toEqual(
+        expect.objectContaining({
+          action: AuditActionEnum.EMAIL_CHANGED,
+          before: { email: user.email },
+          after: { email: 'moved@acme.test' },
+          requestId: 'req-4',
+        }),
+      );
+      expect(JSON.stringify(entry)).not.toContain('password');
     });
   });
 

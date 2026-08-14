@@ -269,6 +269,74 @@
         ]
       }
     },
+    "/api/v1/auth/email": {
+      "patch": {
+        "description": "Moves the account to a different email address and returns a fresh token pair.\n\n**The current password is required**, and for a sharper reason than on a password change. The address *is* the login identity: whoever holds it is who the account belongs to. Changing it with nothing but a borrowed access token would hand the account over.\n\n**Other sessions are not signed out**, unlike a password change. No credential has changed, so ending every session would be disruption without a security reason. The new pair in the response is issued because the access token carries the address and the caller's is now stale. Other devices keep a token naming the old address until it expires, which affects only what a log line says and never what a request may do.\n\nAddresses are matched lowercase, so `Finance@Acme.test` and `finance@acme.test` are the same address. Asking for the address the account already has succeeds and changes nothing.\n\n**The new address is not verified.** Confirming that somebody can receive mail there needs a token sent to it, which needs an email transport this deployment has no provider for. A typo therefore moves the account to an address its owner may not be able to read, and the only way back is the current password.",
+        "operationId": "AuthController_changeEmail_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeEmailDTO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The address was changed. Carries a new token pair.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDTO"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The access token is missing or invalid, or the current password does not match.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The address already belongs to another account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many attempts. Wait and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDTO"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change your login address",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/api/v1/auth/sessions": {
       "get": {
         "description": "Returns every live, unexpired session on the account, newest first.\n\nSessions are identified by when they started and when they were last used, not by a device or browser name. Producing such a name means storing the user agent, and this service does not persist identifiers it does not need.",
@@ -492,7 +560,8 @@
                 "PERIOD_UNLOCKED",
                 "IMPORT_COMPLETED",
                 "NL_QUERY_RUN",
-                "PASSWORD_CHANGED"
+                "PASSWORD_CHANGED",
+                "EMAIL_CHANGED"
               ]
             }
           },
@@ -3066,6 +3135,29 @@
           "newPassword"
         ]
       },
+      "ChangeEmailDTO": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "description": "The password currently on the account. Required: the address is the login identity, so a token alone is not enough.",
+            "format": "password",
+            "minLength": 12,
+            "maxLength": 128
+          },
+          "newEmail": {
+            "type": "string",
+            "description": "The new login address. Stored and matched lowercase, and not verified.",
+            "example": "finance@acme.test",
+            "format": "email",
+            "maxLength": 254
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newEmail"
+        ]
+      },
       "SessionResponseDTO": {
         "type": "object",
         "properties": {
@@ -3130,7 +3222,8 @@
               "PERIOD_UNLOCKED",
               "IMPORT_COMPLETED",
               "NL_QUERY_RUN",
-              "PASSWORD_CHANGED"
+              "PASSWORD_CHANGED",
+              "EMAIL_CHANGED"
             ],
             "example": "PLAN_UPDATED"
           },

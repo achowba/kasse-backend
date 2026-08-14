@@ -58,6 +58,18 @@ A session is identified by when it started and when it was last used. Naming the
 
 Depends on `modules/users` to create and read accounts. Every other feature module depends on this one indirectly, through the global guard and the `@CurrentUser` decorator in `@common/auth`.
 
+## Changing the login address
+
+`PATCH /auth/email` requires the current password, and for a sharper reason than the password route does. The address **is** the login identity: whoever holds it is who the account belongs to. Changing it with nothing but a borrowed access token would hand the account over, which makes it the field that most needs proof beyond a token.
+
+**Other sessions survive, unlike a password change.** No credential has changed, so ending every session would be disruption without a security reason. The caller still gets a fresh pair, because the access token carries the address for log attribution and theirs is now stale. Every other live session keeps a token naming the old address until it expires, which affects only what a log line says and never what a request may do, since authorisation is on the account id alone.
+
+Uniqueness is enforced by catching the index violation rather than by asking first. A check and then a write is two operations with a gap between them, and two requests can both pass the check before either writes. The partial unique index is the only thing that cannot be raced.
+
+Asking for the address the account already has succeeds and changes nothing. Answering `409` against their own account would be a confusing way to say "no change needed".
+
+**The new address is not verified.** Confirming somebody can receive mail there needs a token sent to it, which needs an email transport this deployment has no provider for. A typo therefore moves the account to an address its owner may not be able to read, and the only way back is the current password. Out of scope, and said so rather than half built.
+
 ## Changing a password, and why it is not a reset
 
 `PATCH /auth/password` replaces the password for somebody who already knows it. **The current password is required even though the request is authenticated**, and that is the security model rather than a formality. An access token can be lifted from a machine somebody walked away from, and a change needing only a token would let a borrowed session become a permanent one by locking the owner out of their own account. Knowing the current password is the only evidence here that the caller is the account holder.
@@ -77,6 +89,7 @@ The old access token stays valid until it expires, which is minutes. That is the
 | `POST` | `/api/v1/auth/refresh` | Public | Exchange a refresh token for a new pair. The token is the credential. |
 | `POST` | `/api/v1/auth/logout` | Bearer | Revoke one refresh token. |
 | `PATCH` | `/api/v1/auth/password` | Bearer | Change the password, ending every other session. Requires the current one. |
+| `PATCH` | `/api/v1/auth/email` | Bearer | Change the login address, keeping other sessions. Requires the password. |
 | `GET` | `/api/v1/auth/sessions` | Bearer | List active sessions. |
 | `DELETE` | `/api/v1/auth/sessions` | Bearer | End every session, including the caller's. |
 | `DELETE` | `/api/v1/auth/sessions/:sessionId` | Bearer | End one session. |

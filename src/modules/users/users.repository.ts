@@ -60,6 +60,34 @@ export class UsersRepository {
   }
 
   /**
+   * Moves an account to a different login address.
+   *
+   * @remarks
+   * Lowercased and trimmed on the way in, matching how the schema stores it and
+   * how login looks it up, so `Finance@Acme.test` and `finance@acme.test` cannot
+   * become two accounts.
+   *
+   * Uniqueness is left to the partial index rather than checked here. A check
+   * followed by a write is two operations with a gap between them, and two
+   * requests can both pass the check before either writes. The index is the only
+   * thing that cannot be raced, so the caller catches its error instead.
+   *
+   * @param id - The account identifier.
+   * @param email - The new login address.
+   * @returns The updated account, or null when there is no live account with that id.
+   * @throws Error With the duplicate key code when the address belongs to another live account.
+   */
+  async updateEmail(id: Types.ObjectId, email: string): Promise<UserDocument | null> {
+    return await this.model
+      .findOneAndUpdate(
+        { _id: id, deletedAt: null },
+        { $set: { email: email.trim().toLowerCase() } },
+        { new: true, runValidators: true },
+      )
+      .exec();
+  }
+
+  /**
    * Replaces an account's password hash.
    *
    * @remarks

@@ -22,6 +22,7 @@ import { RequestId } from '@common/request-context';
 import { AUTH_THROTTLE_LIMIT, AUTH_THROTTLE_TTL_MS } from './auth.constants';
 import { AuthService } from './auth.service';
 import { AuthResponseDTO } from './dto/auth-response.dto';
+import { ChangeEmailDTO } from './dto/change-email.dto';
 import { ChangePasswordDTO } from './dto/change-password.dto';
 import { CredentialsDTO } from './dto/credentials.dto';
 import { RefreshTokenDTO } from './dto/refresh-token.dto';
@@ -172,6 +173,42 @@ This is **not** a password reset. Recovering a password nobody knows needs a tok
     @RequestId() requestId?: string,
   ): Promise<AuthResponseDTO> {
     return await this.authService.changePassword(user.userId, input, requestId);
+  }
+
+  /**
+   * Moves the caller's account to a different login address.
+   *
+   * @param user - The authenticated caller.
+   * @param input - The current password and the new address.
+   * @param requestId - The request making the change.
+   * @returns A new token pair carrying the new address.
+   */
+  @Patch('email')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Change your login address',
+    description: `Moves the account to a different email address and returns a fresh token pair.
+
+**The current password is required**, and for a sharper reason than on a password change. The address *is* the login identity: whoever holds it is who the account belongs to. Changing it with nothing but a borrowed access token would hand the account over.
+
+**Other sessions are not signed out**, unlike a password change. No credential has changed, so ending every session would be disruption without a security reason. The new pair in the response is issued because the access token carries the address and the caller's is now stale. Other devices keep a token naming the old address until it expires, which affects only what a log line says and never what a request may do.
+
+Addresses are matched lowercase, so \`Finance@Acme.test\` and \`finance@acme.test\` are the same address. Asking for the address the account already has succeeds and changes nothing.
+
+**The new address is not verified.** Confirming that somebody can receive mail there needs a token sent to it, which needs an email transport this deployment has no provider for. A typo therefore moves the account to an address its owner may not be able to read, and the only way back is the current password.`,
+  })
+  @ApiOkResponse({ description: 'The address was changed. Carries a new token pair.', type: AuthResponseDTO })
+  @ApiUnauthorizedResponse({
+    description: 'The access token is missing or invalid, or the current password does not match.',
+    type: ErrorResponseDTO,
+  })
+  @ApiConflictResponse({ description: 'The address already belongs to another account.', type: ErrorResponseDTO })
+  async changeEmail(
+    @CurrentUser() user: IAuthenticatedUser,
+    @Body() input: ChangeEmailDTO,
+    @RequestId() requestId?: string,
+  ): Promise<AuthResponseDTO> {
+    return await this.authService.changeEmail(user.userId, input, requestId);
   }
 
   /**

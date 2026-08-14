@@ -96,6 +96,51 @@ export class UsersService {
    * @param passwordHash - The new Argon2id hash.
    * @throws NotFoundException When no live account has that id.
    */
+  /**
+   * Moves an account to a different login address.
+   *
+   * @remarks
+   * Uniqueness is not checked here, and that is deliberate rather than an
+   * omission. A check followed by a write is two operations with a gap between
+   * them, and two requests can both pass the check before either writes. The
+   * partial unique index is the only thing that cannot be raced, so the caller
+   * catches its error and turns it into a conflict.
+   *
+   * Whether the caller is allowed to do this is decided before it is called.
+   * This says nothing about proof of identity; it writes.
+   *
+   * @param id - The account identifier.
+   * @param email - The new login address.
+   * @returns The updated account.
+   * @throws NotFoundException When no live account has that id.
+   * @throws Error With the duplicate key code when the address belongs to another live account.
+   */
+  async updateEmail(id: Types.ObjectId, email: string): Promise<UserDocument> {
+    const updated = await this.usersRepository.updateEmail(id, email);
+
+    if (updated === null) {
+      throw new NotFoundException('Account not found.');
+    }
+
+    return updated;
+  }
+
+  /**
+   * Replaces an account's password hash.
+   *
+   * @remarks
+   * Takes a hash, never a password, exactly as {@link create} does. Hashing lives
+   * in the auth module with the argon2 parameters, and this module owns the
+   * collection. Splitting it that way keeps the cost parameters in one place and
+   * means a plaintext password never reaches a service whose job is storage.
+   *
+   * Whether the caller is allowed to do this is decided before it is called.
+   * This says nothing about proof of identity; it writes.
+   *
+   * @param id - The account identifier.
+   * @param passwordHash - The new Argon2id hash.
+   * @throws NotFoundException When no live account has that id.
+   */
   async updatePassword(id: Types.ObjectId, passwordHash: string): Promise<void> {
     const updated = await this.usersRepository.updatePasswordHash(id, passwordHash);
 
