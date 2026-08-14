@@ -33,6 +33,11 @@ Set a monthly spending target per category, log what you actually spend, and rea
 - [Project structure](#project-structure)
 - [Security](#security)
 - [Deployment](#deployment)
+  - [What runs where](#what-runs-where)
+  - [Branching](#branching)
+  - [Deploying from scratch](#deploying-from-scratch)
+  - [Verifying a deploy](#verifying-a-deploy)
+  - [Failure modes worth recognising](#failure-modes-worth-recognising)
 - [Assumptions and tradeoffs](#assumptions-and-tradeoffs)
 - [What I would do before production](#what-i-would-do-before-production)
 
@@ -298,12 +303,19 @@ INFO: listening on http://localhost:1413 {"context":"Bootstrap","environment":"d
 | `JWT_REFRESH_TTL_DAYS` | Refresh token lifetime. | `7` | No |
 | `CORS_ORIGINS` | Comma separated browser origin allowlist. Strict in staging and production, permissive in development and test. | | Yes in production |
 | `THROTTLE_LIMIT` / `THROTTLE_TTL_MS` | Global rate limit. | `120` / `60000` | No |
-| `AUTH_THROTTLE_LIMIT` | Credential routes, which are the ones worth brute forcing. | `10` | No |
+| `AUTH_THROTTLE_LIMIT` / `AUTH_THROTTLE_TTL_MS` | Credential routes, which are the ones worth brute forcing. | `10` / `60000` | No |
 | `REPORT_THROTTLE_LIMIT` | Reports per account per minute. | `60` | No |
 | `IMPORT_THROTTLE_LIMIT` | Imports per account per minute. The most expensive request in the system. | `6` | No |
+| `EXPENSIVE_THROTTLE_TTL_MS` | The window the two limits above are measured over. | `60000` | No |
+| `TOKEN_ISSUER` | Stamped into every access token and required to match when one is verified. | | **Yes** |
+| `PUBLIC_URL` | Where the service answers from outside, used only to make the boot log useful. Must include the scheme. | | No |
 | `ANTHROPIC_API_KEY` | Enables the natural language endpoint. Without it that one route answers `503` and everything else is unaffected. | | No |
 
-Validated at boot, so a missing or malformed value stops the process rather than surfacing at the first request that needs it.
+Every one of these is validated at boot, so a missing or malformed value stops the process rather than surfacing at the first request that needs it. Three consequences worth knowing before a first deploy:
+
+- **`TOKEN_ISSUER` has no default.** A value that silently fell back would let one instance sign with the fallback while another verifies against a configured value, and the symptom is a `401` that reads like an authentication bug rather than a configuration one. Changing it invalidates access tokens already issued; refresh tokens are opaque and unaffected, so clients recover on their next refresh.
+- **`PUBLIC_URL` is optional but not cosmetic.** Unset in a deployed environment, the boot line reports the port and relative paths rather than inventing a hostname. A process behind a proxy cannot discover its own public address, so it has to be told.
+- **`MONGODB_URI` must reach a replica set**, and this is now enforced rather than documented: the service refuses to start against a standalone. See [Deployment](#deployment).
 
 ---
 
@@ -358,6 +370,7 @@ Base path `/api/v1`. Bearer tokens. Every list endpoint paginates and returns `{
 | Area | Endpoints |
 |---|---|
 | **Auth** | `POST /auth/{signup,login,refresh,logout}`, `GET /auth/sessions`, `DELETE /auth/sessions/{:id,all}` |
+| **Credentials** | `PATCH /auth/password` (ends every other session), `PATCH /auth/email` (keeps them). Both require the current password. |
 | **Me** | `GET /me`, `PATCH /me` (currency, fiscal year start) |
 | **Categories** | `GET`, `POST /categories`, `PATCH`, `DELETE /categories/:id` |
 | **Plans** | `GET /plans`, `PUT /plans` (upsert a cell), `PATCH`, `DELETE /plans/:id` |
@@ -467,24 +480,123 @@ examples/          sample CSVs for the import, one valid and one deliberately br
 | Injection | No string concatenation into queries. The natural language endpoint gives the model a filter schema, never a query, and validates what comes back through the same DTO a hand written request uses. |
 | Rate limiting | Per account once authenticated, per address before that. Tighter limits on reports and imports. |
 | Secrets in logs | Redacted recursively at any depth, with cycle and depth guards. `.env` and keys are gitignored and no secret has ever been committed. |
+| Changing a credential | Both `PATCH /auth/password` and `PATCH /auth/email` require the **current password**, not just a valid token. A token can be lifted from an unlocked machine, and the address in particular *is* the login identity, so changing it on a token alone would hand the account over. |
 | Timing | An unknown email still hashes a password on login, so a missing account is not measurably faster to reject. |
+| Starting up | The service refuses to boot against a database that cannot run transactions, rather than failing later on the routes that need one. |
 
 ---
 
 ## Deployment
 
-Multi-stage Dockerfile, non-root user, `dumb-init`, a healthcheck hitting `/api/v1/health`, and a production image with no dev dependencies.
+Live at **https://kasse-production-8392.up.railway.app**
+
+```bash
+curl https://kasse-production-8392.up.railway.app/api/v1/health/ready
+# {"status":"ok","info":{"database":{"status":"up"},"memory_heap":{"status":"up"}}}
+```
+
+`/docs` answers `404` there, deliberately. The documentation UI is withheld in production and available in every other environment.
+
+### What runs where
+
+| Piece | Choice | Why |
+|---|---|---|
+| Runtime | Railway, one service, two environments | Container platform with no cluster to operate. The work is the API, not the infrastructure. |
+| Database | MongoDB Atlas | Always a replica set, so transactions work with no extra configuration. |
+| Image | Multi-stage Dockerfile, non root, `dumb-init`, no dev dependencies | `dumb-init` reaps zombies and forwards `SIGTERM`, so shutdown hooks actually run and connections close rather than being dropped. |
+| Health | `/api/v1/health` liveness, `/api/v1/health/ready` readiness | Liveness answers if the process is up. Readiness touches MongoDB, so a rolling deploy does not send traffic to an instance that cannot reach its database. |
+
+### Branching
+
+`main` is the integration branch and every pull request lands there. **`production` only ever fast forwards from `main`**, never taking a direct or forced push, and that is what Railway deploys.
+
+```bash
+git checkout production && git merge --ff-only main && git push
+```
+
+`--ff-only` is the point: it refuses rather than creating a merge commit, so `production` cannot silently diverge from what was reviewed. CI runs on pushes to both branches, so the full gate runs against exactly what deploys.
+
+### Deploying from scratch
+
+**1. Atlas.** Create the cluster, then a database user, then **Network Access → `0.0.0.0/0`**. Railway's egress address is dynamic, so pinning one address does not hold. Skipping this produces a failure that does not look like what it is:
+
+```
+MongooseServerSelectionError: Could not connect to any servers in your MongoDB Atlas cluster
+  reason: ReplicaSetNoPrimary
+  error:  ERR_SSL_TLSV1_ALERT_INTERNAL_ERROR
+```
+
+Atlas rejects a disallowed address at the TLS layer, so an access list problem arrives as a TLS error rather than a timeout. The tell is timing: all retries complete in the same second, whereas a genuinely unreachable host burns the five second server selection timeout on each attempt.
+
+**2. Generate a keypair for that environment.** Never reuse the local one.
+
+```bash
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out private.pem
+openssl rsa -pubout -in private.pem -out public.pem
+base64 < private.pem | tr -d '\n' | pbcopy   # JWT_PRIVATE_KEY
+base64 < public.pem  | tr -d '\n' | pbcopy   # JWT_PUBLIC_KEY
+rm private.pem public.pem
+```
+
+**Base64, not the PEM itself.** A PEM contains newlines and an environment variable is one line. Pasting the raw PEM is caught at boot rather than at the first login, because validation decodes both keys and checks for the PEM marker.
+
+**3. Set the variables.** Everything from [Environment variables](#environment-variables) that is required, plus:
+
+| Variable | Value | Note |
+|---|---|---|
+| `NODE_ENV` | `production` | Withholds `/docs` and makes the CORS allowlist strict. |
+| `PORT` | `1413` | Set it explicitly. Railway routes to this port, and leaving it unset means the app binds its own default while the proxy targets something else. |
+| `PUBLIC_URL` | the generated domain, with `https://` | Without it the boot log reports the port and relative paths instead of an address. |
+| `TOKEN_ISSUER` | `kasse-api` | Required. Per environment values are fine and are what makes a staging token unusable against production. |
+| `CORS_ORIGINS` | the deployed frontend origin | Exact match outside development. A missing entry fails every browser request at preflight while `curl` keeps working. |
+
+**4. Generate a domain** in Railway before setting `PUBLIC_URL`, since the value has to match.
+
+**5. Push to `production`** and read the boot line:
+
+```
+listening on https://kasse-production-8392.up.railway.app
+port: 1413   environment: production
+api:    https://kasse-production-8392.up.railway.app/api/v1
+health: https://kasse-production-8392.up.railway.app/api/v1/health
+```
+
+### Verifying a deploy
+
+Health alone does not prove much: the process can be up while the database is unreachable, and reads can work while transactions do not.
+
+```bash
+BASE=https://kasse-production-8392.up.railway.app/api/v1
+
+curl -s $BASE/health/ready                      # database: up
+TOKEN=$(curl -s -X POST $BASE/auth/signup -H 'Content-Type: application/json' \
+  -d '{"email":"smoke@example.test","password":"a-long-enough-password"}' | jq -r .accessToken)
+curl -s -X POST $BASE/auth/refresh ...          # exercises a transaction
+```
+
+**Refresh is the meaningful check.** It rotates tokens inside a transaction, so a `200` proves the deployment can do the thing a standalone database cannot. Everything else can pass while that is broken.
+
+### Failure modes worth recognising
+
+| Symptom | Cause |
+|---|---|
+| `Invalid environment configuration: ...` at boot | A required variable is missing or malformed. The message names it. |
+| `MongoDB is a standalone deployment` at boot | The database is not a replica set. Cannot happen on Atlas. |
+| TLS internal error, retries finishing instantly | Atlas access list, not a network problem. |
+| Boot line says `listening on port 1413` rather than a URL | `PUBLIC_URL` is unset. Cosmetic. |
+| `401` on every request straight after a deploy | `TOKEN_ISSUER` changed. Clients recover on their next refresh, within the access token lifetime. |
+| Browser requests fail while `curl` works | `CORS_ORIGINS` does not list the frontend origin. |
+
+### Running the image directly
 
 ```bash
 docker build -t kasse-api .
 docker run -p 1413:1413 --env-file .env kasse-api
 ```
 
-Target is Railway with MongoDB Atlas. Atlas is already a replica set, so transactions work without extra configuration. Set every variable from the table above, with `NODE_ENV=production`, `CORS_ORIGINS` set to the real frontend origin, and a keypair generated for that environment rather than reused from local.
+### On AWS
 
-> **Status.** Not yet deployed. The live URL goes here once the platform credentials are in place.
-
-**On AWS** this would be ECS Fargate behind an ALB, the image in ECR, secrets in Secrets Manager rather than environment variables, DocumentDB or Atlas for the database, and CloudWatch for the JSON logs the application already emits.
+ECS Fargate behind an ALB, the image in ECR, and secrets in Secrets Manager rather than environment variables, which is the one real difference: Railway holds them as plain variables, so a compromised dashboard is a compromised signing key. DocumentDB or Atlas for the database, noting that DocumentDB's transaction support is not identical and would need the CSV import path re-verified. CloudWatch consumes the JSON logs the application already emits, with no format change, and the request id is already on every line for correlation.
 
 ---
 
@@ -513,3 +625,4 @@ Target is Railway with MongoDB Atlas. Atlas is already a replica set, so transac
 5. **Refresh token reuse alerting.** The family revoke is detected and logged loudly, and nothing pages anyone.
 6. **Per category budgets across fiscal years**, and a rollover of underspend, both of which real finance teams ask for immediately.
 7. **Soft delete retention.** Nothing is ever purged. A real deployment needs a retention policy and a lawful deletion path.
+8. **Email verification and password reset.** Both need an email transport this deployment has no provider for. Today an address change takes effect unverified, and a forgotten password has no recovery path. The first is the more pressing of the two: a typo moves an account to an address its owner may not be able to read.
