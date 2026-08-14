@@ -4,10 +4,35 @@ Set a monthly spending target per category, log what you actually spend, and rea
 
 *Kasse* is German and Danish for the till: the box the money sits in, and the thing you count at the end of the day.
 
+**Live:** https://kasse-production-8392.up.railway.app  ·  **Contract:** [`openapi.json`](openapi.json)
+
+---
+
+## Where to look first
+
+This README is long because it explains the reasoning behind each decision. If you would rather see it work, this is the short path.
+
+**Run it** in about a minute: [Quickstart](#quickstart). Then `npm run seed:spec` and read the report, which reproduces the sample table exactly.
+
+**The three files worth reading**, if you read nothing else:
+
+| File | Why |
+|---|---|
+| [`src/common/money/variance.ts`](src/common/money/variance.ts) | The whole product in one pure function. Every awkward case lives here: a plan of zero, a month with no spend, and the difference between "spent nothing" and "no record". |
+| [`src/modules/reports/reports.repository.ts`](src/modules/reports/reports.repository.ts) | One aggregation produces the report. It unions plans with spend rather than joining from the plan side, so a category with spend and no plan is not silently dropped, which is the case that matters most. |
+| [`src/common/database/base.repository.ts`](src/common/database/base.repository.ts) | Tenancy in one place. Every query is scoped to the account here rather than in each handler, because filtering per handler is one forgotten line away from returning somebody else's financial records. |
+
+**The three decisions most worth disagreeing with**, each argued in place: [money as integer minor units](#money-is-an-integer), [a month as a `YYYY-MM` string](#a-month-is-a-string), and [variance of `null` rather than infinity when the plan is zero](#variance-and-the-three-cases-that-break-it).
+
+**Try the import** without writing a CSV: [`examples/`](examples/) has one that works and one that fails four ways, so the per line error list and the all or nothing write are both visible.
+
+**What is deliberately missing**, and why, is in [Assumptions and tradeoffs](#assumptions-and-tradeoffs) rather than left for you to find.
+
 ---
 
 ## Table of contents
 
+- [Where to look first](#where-to-look-first)
 - [What it does](#what-it-does)
 - [Quickstart](#quickstart)
 - [The problem it solves](#the-problem-it-solves)
