@@ -54,7 +54,7 @@ export default tseslint.config(
       'import/newline-after-import': ['error', { count: 1 }],
       'import/no-extraneous-dependencies': [
         'error',
-        { devDependencies: ['**/*.spec.ts', 'test/**/*.ts', '**/*.config.ts', 'eslint.config.mjs'] },
+        { devDependencies: ['**/*.spec.ts', 'test/**/*.ts', '**/*.config.ts', 'eslint.config.mjs', 'scripts/**'] },
       ],
       'import/order': [
         'error',
@@ -99,4 +99,20 @@ export default tseslint.config(
   // Config and other plain JS/MJS files sit outside the TypeScript project, so
   // lint them without type information rather than excluding them entirely.
   { files: ['**/*.mjs', '**/*.cjs', '**/*.js'], ...tseslint.configs.disableTypeChecked },
+  {
+    // Build tooling, run by npm scripts and by CI, never shipped. It is Node
+    // rather than application code, so it gets Node globals and is not held to
+    // the annotation rules that exist for the typed source tree.
+    //
+    // It is still linted. A script that silently breaks takes a check in CI with
+    // it, and the coverage floor is only worth having if the thing enforcing it
+    // runs.
+    files: ['scripts/**/*.mjs', 'scripts/**/*.js'],
+    // Declared by hand rather than pulling in the `globals` package, which
+    // would be a dependency for two identifiers.
+    languageOptions: { globals: { console: 'readonly', process: 'readonly' } },
+    rules: {
+      '@typescript-eslint/explicit-function-return-type': 'off',
+    },
+  },
 );
