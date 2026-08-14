@@ -1,20 +1,43 @@
 {
-  "moduleFileExtensions": ["js", "json", "ts"],
-  "rootDir": ".",
+  "moduleFileExtensions": [
+    "js",
+    "json",
+    "ts"
+  ],
+  "rootDir": "..",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
-  "setupFiles": ["<rootDir>/jest.setup.ts"],
-  "globalSetup": "<rootDir>/global-setup.ts",
-  "globalTeardown": "<rootDir>/global-teardown.ts",
+  "setupFiles": [
+    "<rootDir>/test/jest.setup.ts"
+  ],
+  "globalSetup": "<rootDir>/test/global-setup.ts",
+  "globalTeardown": "<rootDir>/test/global-teardown.ts",
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },
   "moduleNameMapper": {
-    "^@common/(.*)$": "<rootDir>/../src/common/$1",
-    "^@modules/(.*)$": "<rootDir>/../src/modules/$1"
+    "^@common/(.*)$": "<rootDir>/src/common/$1",
+    "^@modules/(.*)$": "<rootDir>/src/modules/$1"
   },
   "clearMocks": true,
   "restoreMocks": true,
   "testTimeout": 30000,
-  "maxWorkers": 1
+  "maxWorkers": 1,
+  "coverageDirectory": "coverage-e2e",
+  "collectCoverageFrom": [
+    "src/**/*.ts",
+    "!src/main.ts",
+    "!src/seed/main.ts",
+    "!src/**/index.ts",
+    "!src/**/*.module.ts",
+    "!src/**/*.constants.ts",
+    "!src/**/*.document.ts",
+    "!src/**/schemas/**",
+    "!src/**/dto/**",
+    "!src/**/*.spec.ts"
+  ],
+  "coverageReporters": [
+    "json",
+    "text-summary"
+  ]
 }

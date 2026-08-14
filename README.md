@@ -443,12 +443,21 @@ Every folder carries its own README explaining what it does and why it is built 
 ## Testing
 
 ```bash
-npm test          # unit
-npm run test:cov  # with coverage thresholds enforced
-npm run test:e2e  # against a real MongoDB
+npm test              # unit
+npm run test:cov      # unit, with thresholds enforced
+npm run test:e2e      # against a real MongoDB
+npm run test:cov:all  # both, merged into one report with its own floor
 ```
 
-**413 unit tests and 119 end to end**, 86% statement coverage.
+**540 unit tests and 169 end to end.** Merged coverage is **95.7% of statements, 91.7% of functions, 79.9% of branches**, across 80 files.
+
+### Why there are two coverage numbers
+
+`npm run test:cov` reports **87.6%** across 53 files, and that is a different measurement rather than a contradiction.
+
+The unit run deliberately excludes controllers, repositories, guards, strategies, and bootstrap. Unit testing a thin translation layer against a mock measures the mock, so excluding them keeps that figure honest about the logic it does cover. The cost is that it describes services and utilities rather than the application, while the suite that exercises those excluded layers against a real database contributed to no reported number at all.
+
+`npm run test:cov:all` runs both, merges the two istanbul maps, and enforces a floor on the result. **27 files are reached only by the end to end suite**, including every controller, `BaseTenantRepository`, and the JWT guard. Merging is about making the number mean what a reader assumes it means, not about making it larger, and the floors are enforced rather than reported: a threshold nothing checks drifts down one pull request at a time.
 
 Unit tests sit beside their source and mock external dependencies. End to end tests run against a real in-memory MongoDB replica set, because the things worth testing there are database behaviour: `$unionWith`, `$facet`, transactions rolling back, and unique indexes refusing a duplicate.
 
