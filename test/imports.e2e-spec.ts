@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs';
 import type { Server } from 'node:http';
+import { join } from 'node:path';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -327,6 +329,59 @@ describe('Imports (e2e)', () => {
         .set('Idempotency-Key', 'anon')
         .attach('file', Buffer.from([header, 'Marketing,2028-03,1.00,'].join('\n'), 'utf8'), 'expenses.csv')
         .expect(401);
+    });
+  });
+
+  describe('the sample files committed to examples/', () => {
+    // Documentation that is not executed rots. These are offered to a reader as
+    // "upload this and it works", and the categories in them come from the
+    // shared catalogue, so renaming one entry there would break the promise
+    // silently. Reading the real files is the only thing that catches it.
+    const sample = (name: string): Buffer => readFileSync(join(__dirname, '..', 'examples', name));
+
+    it('imports the valid one on an account that has done nothing but sign up', async () => {
+      const response = await request(server())
+        .post('/api/v1/imports/expenses')
+        .set('Authorization', auth())
+        .set('Idempotency-Key', `sample-valid-${String(Date.now())}`)
+        .attach('file', sample('expenses.csv'), 'expenses.csv')
+        .expect(201);
+
+      const batch = response.body as IBatchBody;
+
+      expect(batch.status).toBe('COMPLETED');
+      expect(batch.errorCount).toBe(0);
+      expect(batch.expenseCount).toBe(batch.rowCount);
+    });
+
+    it('rejects the broken one with an error on every line the README lists, and writes nothing', async () => {
+      // Measured as a delta rather than against zero: the valid sample above
+      // also writes to 2026-02, so an absolute count would assert its data and
+      // say nothing at all about this upload.
+      const before = await countExpenses('2026-02');
+
+      const response = await request(server())
+        .post('/api/v1/imports/expenses')
+        .set('Authorization', auth())
+        .set('Idempotency-Key', `sample-broken-${String(Date.now())}`)
+        .attach('file', sample('expenses-with-errors.csv'), 'expenses-with-errors.csv')
+        .expect(422);
+
+      const body = response.body as IErrorBody;
+
+      // The lines and columns the examples README publishes. If the file is
+      // edited and the README is not, the documentation is wrong and this says
+      // so.
+      expect(body.details?.errors).toEqual([
+        expect.objectContaining({ line: 3, column: 'category' }),
+        expect.objectContaining({ line: 4, column: 'month' }),
+        expect.objectContaining({ line: 5, column: 'amount' }),
+        expect.objectContaining({ line: 6, column: 'category' }),
+      ]);
+
+      // All or nothing, including the two rows in that file that are perfectly
+      // valid. This is the property that makes a corrected file safe to retry.
+      expect(await countExpenses('2026-02')).toBe(before);
     });
   });
 });

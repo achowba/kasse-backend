@@ -42,6 +42,8 @@ Payroll,2026-01,20500.00
 | Blank lines | Skipped, not reported as rows. |
 | Byte order mark | Stripped, because Excel writes one. |
 
+Two files in [`examples/`](../../../examples/) are ready to upload: one that imports cleanly and one that fails every way this parser can report, so the per line error list can be seen without constructing a bad file by hand.
+
 ## Errors point at lines, not at rows
 
 The header is line 1, so the first data row is line 2. Reporting an array index instead would send someone to the wrong line of their spreadsheet.
