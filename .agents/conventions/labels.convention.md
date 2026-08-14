@@ -1,6 +1,6 @@
 # Labels convention
 
-Issues and pull requests are triaged with the GitHub label set on `achowba/kasse`. Labels are grouped by category and hue: `type:` (green), `priority:` (red to amber), `status:` (brown), `module:` (blue), `area:` (teal), `integration:` (purple), the GitHub defaults (grey), and flat cross-cutting concerns (orange). Every description says when to apply; GitHub caps each at 100 characters.
+Issues and pull requests are triaged with the GitHub label set on `achowba/kasse-backend`. Labels are grouped by category and hue: `type:` (green), `priority:` (red to amber), `status:` (brown), `module:` (blue), `area:` (teal), `integration:` (purple), the GitHub defaults (grey), and flat cross-cutting concerns (orange). Every description says when to apply; GitHub caps each at 100 characters.
 
 ## Local cache
 
@@ -8,7 +8,7 @@ A local cache lives at `.artifacts/labels/labels.json` (gitignored), shaped:
 
 ```json
 {
-  "repo": "achowba/kasse",
+  "repo": "achowba/kasse-backend",
   "lastFetchedAt": "<ISO 8601 UTC>",
   "labels": [{ "name": "...", "description": "...", "color": "..." }]
 }
@@ -18,7 +18,7 @@ A local cache lives at `.artifacts/labels/labels.json` (gitignored), shaped:
 
 ## When labeling a PR or issue
 
-1. **Refresh if stale.** If the cache is missing, or its `lastFetchedAt` is more than 2 days old, refresh it first: `gh api repos/achowba/kasse/labels --paginate`, rewrite the file, and set `lastFetchedAt` to the current UTC time.
+1. **Refresh if stale.** If the cache is missing, or its `lastFetchedAt` is more than 2 days old, refresh it first: `gh api repos/achowba/kasse-backend/labels --paginate`, rewrite the file, and set `lastFetchedAt` to the current UTC time.
 2. **Label the relevant dimensions.** Apply from the cache: one `type:` (or `documentation` for a docs-only PR), the `module:`(s) touched, and `priority:`/`status:` as they apply; add `area:`, `integration:`, or a concern label (`security`, `data-integrity`, `error-handling`) where relevant. Example: `gh pr edit <n> --add-label "type:feat,module:reports,priority:high"`.
 3. **Upsert a missing label.** If a needed label is not on GitHub yet, create it with a category-appropriate hue (`gh label create "<name>" --color <hex> --description "<text, 100 chars max>" --force`), then refresh the cache. Never delete labels.
 

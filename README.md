@@ -81,7 +81,7 @@ There is also a natural language endpoint. You ask *"how did marketing do in Q1 
 ## Quickstart
 
 ```bash
-git clone https://github.com/achowba/kasse.git && cd kasse
+git clone https://github.com/achowba/kasse-backend.git && cd kasse-backend
 npm ci
 cp .env.example .env                 # then set JWT_PRIVATE_KEY and JWT_PUBLIC_KEY, see below
 docker compose up -d                 # MongoDB as a single node replica set
